@@ -1013,7 +1013,7 @@ struct longdoubletest128{
 	std::uint_least64_t mantissa; std::uint_least64_t signexponent;// padded to 128 bits
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_FUNC_INLINE bool operator==(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE bool operator==(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		std::uint_least16_t e{static_cast<std::uint_least16_t>(signexponent)};
 		std::uint_least64_t m{mantissa};
 		e ^= static_cast<std::uint_least16_t>(other.signexponent);
@@ -1023,7 +1023,7 @@ struct longdoubletest128{
 	}
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_FUNC_INLINE auto operator<(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE auto operator<(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 		std::uint_least16_t eleft{static_cast<std::uint_least16_t>(signexponent)}, eright{static_cast<std::uint_least16_t>(other.signexponent)};
 		if constexpr(!isabsvalue && issignmode && !isfltpmode){// flip the high bit (use an unsigned comparison because of a lack of an overflow flag for the output)
@@ -1096,7 +1096,7 @@ struct longdoubletest128{
 	}
 
 	// warning: this minus operator performs subtraction with only the top part returned as result, used to propagate the sign bit next, and not the full difference
-	RSBD8_FUNC_INLINE std::intptr_t operator-(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE std::intptr_t operator-(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
@@ -1154,7 +1154,7 @@ struct longdoubletest128{
 		return{static_cast<std::intptr_t>(static_cast<std::int_least16_t>(rsign))};// force sign-extension
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator~()const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator~()const noexcept{
 		return{longdoubletest128<isabsvalue, issignmode, isfltpmode>{~mantissa, ~signexponent}};
 	}
 
@@ -1171,7 +1171,7 @@ struct longdoubletest128{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &other)const noexcept{
 		return{longdoubletest128<isabsvalue, issignmode, isfltpmode>{*this} &= other};
 	}
 
@@ -1188,7 +1188,7 @@ struct longdoubletest128{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &other)const noexcept{
 		return{longdoubletest128<isabsvalue, issignmode, isfltpmode>{*this} ^= other};
 	}
 
@@ -1205,7 +1205,7 @@ struct longdoubletest128{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &other)const noexcept{
 		return{longdoubletest128<isabsvalue, issignmode, isfltpmode>{*this} |= other};
 	}
 
@@ -1222,7 +1222,7 @@ struct longdoubletest128{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator&(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator&(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		return{longdoubletest128<isabsvalue, issignmode, isfltpmode>{*this} &= other};
 	}
 
@@ -1239,7 +1239,7 @@ struct longdoubletest128{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator^(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator^(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		return{longdoubletest128<isabsvalue, issignmode, isfltpmode>{*this} ^= other};
 	}
 
@@ -1256,7 +1256,7 @@ struct longdoubletest128{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator|(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator|(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		return{longdoubletest128<isabsvalue, issignmode, isfltpmode>{*this} |= other};
 	}
 };
@@ -1268,7 +1268,7 @@ struct longdoubletest96{
 	std::uint_least64_t mantissa; std::uint_least32_t signexponent;// padded to 96 bits
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_FUNC_INLINE bool operator==(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE bool operator==(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		std::uint_least16_t e{static_cast<std::uint_least16_t>(signexponent)};
 		std::uint_least64_t m{mantissa};
 		e ^= static_cast<std::uint_least16_t>(other.signexponent);
@@ -1278,7 +1278,7 @@ struct longdoubletest96{
 	}
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_FUNC_INLINE auto operator<(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE auto operator<(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 		std::uint_least16_t eleft{static_cast<std::uint_least16_t>(signexponent)}, eright{static_cast<std::uint_least16_t>(other.signexponent)};
 		if constexpr(!isabsvalue && issignmode && !isfltpmode){// flip the high bit (use an unsigned comparison because of a lack of an overflow flag for the output)
@@ -1351,7 +1351,7 @@ struct longdoubletest96{
 	}
 
 	// warning: this minus operator performs subtraction with only the top part returned as result, used to propagate the sign bit next, and not the full difference
-	RSBD8_FUNC_INLINE std::intptr_t operator-(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE std::intptr_t operator-(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
@@ -1409,7 +1409,7 @@ struct longdoubletest96{
 		return{static_cast<std::intptr_t>(static_cast<std::int_least16_t>(rsign))};// force sign-extension
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator~()const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator~()const noexcept{
 		return{longdoubletest96<isabsvalue, issignmode, isfltpmode>{~mantissa, ~signexponent}};
 	}
 
@@ -1424,7 +1424,7 @@ struct longdoubletest96{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &other)const noexcept{
 		return{longdoubletest96<isabsvalue, issignmode, isfltpmode>{*this} &= other};
 	}
 
@@ -1439,7 +1439,7 @@ struct longdoubletest96{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &other)const noexcept{
 		return{longdoubletest96<isabsvalue, issignmode, isfltpmode>{*this} ^= other};
 	}
 
@@ -1454,7 +1454,7 @@ struct longdoubletest96{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &other)const noexcept{
 		return{longdoubletest96<isabsvalue, issignmode, isfltpmode>{*this} |= other};
 	}
 
@@ -1469,7 +1469,7 @@ struct longdoubletest96{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator&(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator&(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		return{longdoubletest96<isabsvalue, issignmode, isfltpmode>{*this} &= other};
 	}
 
@@ -1484,7 +1484,7 @@ struct longdoubletest96{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator^(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator^(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		return{longdoubletest96<isabsvalue, issignmode, isfltpmode>{*this} ^= other};
 	}
 
@@ -1499,7 +1499,7 @@ struct longdoubletest96{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator|(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator|(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		return{longdoubletest96<isabsvalue, issignmode, isfltpmode>{*this} |= other};
 	}
 };
@@ -1510,7 +1510,7 @@ struct longdoubletest80{
 	std::uint_least64_t mantissa; std::uint_least16_t signexponent;
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_FUNC_INLINE bool operator==(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE bool operator==(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		std::uint_least16_t e{signexponent};
 		std::uint_least64_t m{mantissa};
 		e ^= other.signexponent;
@@ -1520,7 +1520,7 @@ struct longdoubletest80{
 	}
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_FUNC_INLINE auto operator<(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE auto operator<(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 		std::uint_least16_t eleft{signexponent}, eright{other.signexponent};
 		if constexpr(!isabsvalue && issignmode && !isfltpmode){// flip the high bit (use an unsigned comparison because of a lack of an overflow flag for the output)
@@ -1593,7 +1593,7 @@ struct longdoubletest80{
 	}
 
 	// warning: this minus operator performs subtraction with only the top part returned as result, used to propagate the sign bit next, and not the full difference
-	RSBD8_FUNC_INLINE std::intptr_t operator-(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE std::intptr_t operator-(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
@@ -1651,7 +1651,7 @@ struct longdoubletest80{
 		return{static_cast<std::intptr_t>(static_cast<std::int_least16_t>(rsign))};// force sign-extension
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator~()const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator~()const noexcept{
 		return{longdoubletest80<isabsvalue, issignmode, isfltpmode>{~mantissa, ~signexponent}};
 	}
 
@@ -1666,7 +1666,7 @@ struct longdoubletest80{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &other)const noexcept{
 		return{longdoubletest80<isabsvalue, issignmode, isfltpmode>{*this} &= other};
 	}
 
@@ -1681,7 +1681,7 @@ struct longdoubletest80{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &other)const noexcept{
 		return{longdoubletest80<isabsvalue, issignmode, isfltpmode>{*this} ^= other};
 	}
 
@@ -1696,7 +1696,7 @@ struct longdoubletest80{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &other)const noexcept{
 		return{longdoubletest80<isabsvalue, issignmode, isfltpmode>{*this} |= other};
 	}
 
@@ -1711,7 +1711,7 @@ struct longdoubletest80{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator&(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator&(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		return{longdoubletest80<isabsvalue, issignmode, isfltpmode>{*this} &= other};
 	}
 
@@ -1726,7 +1726,7 @@ struct longdoubletest80{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator^(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator^(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		return{longdoubletest80<isabsvalue, issignmode, isfltpmode>{*this} ^= other};
 	}
 
@@ -1741,7 +1741,7 @@ struct longdoubletest80{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator|(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator|(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		return{longdoubletest80<isabsvalue, issignmode, isfltpmode>{*this} |= other};
 	}
 };
@@ -1845,7 +1845,7 @@ struct alignas(std::hardware_constructive_interference_size) offsetstype : std::
 // This is a dirty method that heavily relies on proper inlining and compiler optimisation of that, but it at least can detect the floating-point mixed endianness cases if used properly.
 
 template<typename T>
-RSBD8_FUNC_INLINE constexpr std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	128u >= CHAR_BIT * sizeof(T) &&
 	std::is_integral_v<stripenum<T>>,
 	T> generatehighbit()noexcept{
@@ -1855,7 +1855,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 }
 
 template<typename T>
-RSBD8_FUNC_INLINE constexpr std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	128u >= CHAR_BIT * sizeof(T) &&
 	std::is_floating_point_v<stripenum<T>>,
 	T> generatehighbit()noexcept{
@@ -1865,7 +1865,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 }
 
 template<typename T>
-RSBD8_FUNC_INLINE constexpr std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	std::is_same_v<T, longdoubletest128<false, false, false>> ||
 	std::is_same_v<T, longdoubletest128<false, false, true>> ||
 	std::is_same_v<T, longdoubletest128<false, true, false>> ||
@@ -1897,7 +1897,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// disable the recompose64<isfltpmode>() endianess helper and test64 struct on 64-bit and larger systems
 template<bool isfltpmode>
-RSBD8_FUNC_INLINE std::uint_least64_t recompose64(std::uint_least32_t lo, std::uint_least32_t hi)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::uint_least64_t recompose64(std::uint_least32_t lo, std::uint_least32_t hi)noexcept{
 	if constexpr(1u < sizeof(double)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
 		static auto constexpr highbit{generatehighbit<std::conditional_t<isfltpmode, double, std::uint_least64_t>>()};
@@ -1920,7 +1920,7 @@ struct test64{
 	std::uint_least32_t data[2];
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_FUNC_INLINE bool operator==(test64<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE bool operator==(test64<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		std::uint_least32_t a{data[0]};
 		std::uint_least32_t b{data[1]};
 		a ^= other.data[0];
@@ -1930,7 +1930,7 @@ struct test64{
 	}
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_FUNC_INLINE auto operator<(test64<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE auto operator<(test64<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		std::size_t LO{}, HI{1u};// little-endian case
 		if constexpr(1u < sizeof(double)){
 			// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -1972,7 +1972,7 @@ struct test64{
 	}
 
 	// warning: this minus operator performs subtraction with only the top part returned as result, used to propagate the sign bit next, and not the full difference
-	RSBD8_FUNC_INLINE std::intptr_t operator-(test64<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE std::intptr_t operator-(test64<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		if constexpr(1u < sizeof(double)){
 			// basic endianess detection, relies on proper inlining and compiler optimisation of that
 			static auto constexpr highbit{generatehighbit<std::conditional_t<isfltpmode, double, std::uint_least64_t>>()};
@@ -2012,7 +2012,7 @@ struct test64{
 		return{static_cast<std::intptr_t>(rhi)};
 	}
 
-	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator~()const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator~()const noexcept{
 		return{test64<isabsvalue, issignmode, isfltpmode>{~data[0], ~data[1]}};
 	}
 
@@ -2022,7 +2022,7 @@ struct test64{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &other)noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &other)const noexcept{
 		return{{data[0] & static_cast<std::uint_least32_t>(other),
 			data[1] & static_cast<std::uint_least32_t>(other)}};
 	}
@@ -2033,7 +2033,7 @@ struct test64{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &other)noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &other)const noexcept{
 		return{{data[0] ^ static_cast<std::uint_least32_t>(other),
 			data[1] ^ static_cast<std::uint_least32_t>(other)}};
 	}
@@ -2044,7 +2044,7 @@ struct test64{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &other)noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &other)const noexcept{
 		return{{data[0] | static_cast<std::uint_least32_t>(other),
 			data[1] | static_cast<std::uint_least32_t>(other)}};
 	}
@@ -2055,7 +2055,7 @@ struct test64{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator&(test64<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator&(test64<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		return{{data[0] & other.data[0],
 			data[1] & other.data[1]}};
 	}
@@ -2066,7 +2066,7 @@ struct test64{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator^(test64<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator^(test64<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		return{{data[0] ^ other.data[0],
 			data[1] ^ other.data[1]}};
 	}
@@ -2077,14 +2077,14 @@ struct test64{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator|(test64<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator|(test64<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		return{{data[0] | other.data[0],
 			data[1] | other.data[1]}};
 	}
 };
 
 template<typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test64<false, false, false>> ||
 	std::is_same_v<T, test64<false, true, false>> ||
 	std::is_same_v<T, test64<true, false, false>> ||
@@ -2106,7 +2106,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test64<false, false, true>> ||
 	std::is_same_v<T, test64<false, true, true>> ||
 	std::is_same_v<T, test64<true, false, true>> ||
@@ -2134,7 +2134,7 @@ struct test128{
 	std::uint_least64_t data[2];
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_FUNC_INLINE bool operator==(test128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE bool operator==(test128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		std::uint_least64_t a{data[0]};
 		std::uint_least64_t b{data[1]};
 		a ^= other.data[0];
@@ -2144,7 +2144,7 @@ struct test128{
 	}
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_FUNC_INLINE auto operator<(test128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE auto operator<(test128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		std::size_t LO{}, HI{1u};// little-endian case
 		if constexpr(1u < sizeof(std::uintmax_t)){
 			// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -2193,7 +2193,7 @@ struct test128{
 	}
 
 	// warning: this minus operator performs subtraction with only the top part returned as result, used to propagate the sign bit next, and not the full difference
-	RSBD8_FUNC_INLINE std::intptr_t operator-(test128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE std::intptr_t operator-(test128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		if constexpr(1u < sizeof(std::uintmax_t)){
 			// basic endianess detection, relies on proper inlining and compiler optimisation of that
 			static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
@@ -2247,7 +2247,7 @@ struct test128{
 		return{static_cast<std::intptr_t>(rhi)};
 	}
 
-	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator~()const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator~()const noexcept{
 		return{test128<isabsvalue, issignmode, isfltpmode>{~data[0], ~data[1]}};
 	}
 
@@ -2257,7 +2257,7 @@ struct test128{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &other)noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &other)const noexcept{
 		return{{data[0] & static_cast<std::uint_least64_t>(other),
 			data[1] & static_cast<std::uint_least64_t>(other)}};
 	}
@@ -2268,7 +2268,7 @@ struct test128{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &other)noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &other)const noexcept{
 		return{{data[0] ^ static_cast<std::uint_least64_t>(other),
 			data[1] ^ static_cast<std::uint_least64_t>(other)}};
 	}
@@ -2279,7 +2279,7 @@ struct test128{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &other)noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &other)const noexcept{
 		return{{data[0] | static_cast<std::uint_least64_t>(other),
 			data[1] | static_cast<std::uint_least64_t>(other)}};
 	}
@@ -2290,7 +2290,7 @@ struct test128{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator&(test128<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator&(test128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		return{{data[0] & other.data[0],
 			data[1] & other.data[1]}};
 	}
@@ -2301,7 +2301,7 @@ struct test128{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator^(test128<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator^(test128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		return{{data[0] ^ other.data[0],
 			data[1] ^ other.data[1]}};
 	}
@@ -2312,14 +2312,14 @@ struct test128{
 		return{*this};
 	}
 
-	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator|(test128<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator|(test128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
 		return{{data[0] | other.data[0],
 			data[1] | other.data[1]}};
 	}
 };
 
 template<typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test128<false, false, false>> ||
 	std::is_same_v<T, test128<false, false, true>> ||
 	std::is_same_v<T, test128<false, true, false>> ||
@@ -2369,7 +2369,7 @@ struct memberobjectgenerator{
 // versions that will split off the first parameter (pointer only)
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded, typename U, typename W>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
 	isextraparam &&
@@ -2383,7 +2383,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded, typename U, typename W>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
 	isextraparam &&
@@ -2397,7 +2397,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	isextraparam &&
 	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
@@ -2415,7 +2415,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	isextraparam &&
 	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
@@ -2432,7 +2432,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
 	isextraparam &&
@@ -2445,7 +2445,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
 	isextraparam &&
@@ -2459,7 +2459,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded, typename W, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
 	isextraparam &&
@@ -2473,7 +2473,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded, typename W, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
 	isextraparam &&
@@ -2488,7 +2488,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
 	isextraparam &&
@@ -2501,7 +2501,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
 	isextraparam &&
@@ -2517,7 +2517,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // versions that will not split off the first parameter
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename U, typename W>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
 	!isextraparam &&
@@ -2531,7 +2531,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename U, typename W>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
 	!isextraparam &&
@@ -2545,7 +2545,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	!isextraparam &&
 	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
@@ -2563,7 +2563,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	!isextraparam &&
 	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
@@ -2580,7 +2580,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
 	!isextraparam &&
@@ -2593,7 +2593,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
 	!isextraparam &&
@@ -2607,7 +2607,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename W, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
 	!isextraparam &&
@@ -2621,7 +2621,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename W, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
 	!isextraparam &&
@@ -2636,7 +2636,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
 	!isextraparam &&
@@ -2649,7 +2649,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
 	!isextraparam &&
@@ -2665,14 +2665,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // Utilities to split off the first parameter
 
 template<bool isextraparam, typename isdiscarded, typename W, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	isextraparam,
 	W> splitparameter(isdiscarded, W first, vararguments...)noexcept{
 	return{first};
 }
 
 template<bool isextraparam, typename W, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	!isextraparam,
 	W> splitparameter(W first, vararguments...)noexcept{
 	return{first};
@@ -2687,7 +2687,7 @@ RSBD8_FUNC_INLINE void splitparameter()noexcept{
 
 // utility template to either retrieve the first-level source or output another pointer for second-level indirection
 template<auto indirection1, bool isindexed2, bool isextraparam, typename T, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE auto indirectinput1(V *RSBD8_RESTRICT p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *, vararguments...>){
+RSBD8_NODISCARD RSBD8_FUNC_INLINE auto indirectinput1(V *RSBD8_RESTRICT p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *, vararguments...>){
 	using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *, vararguments...>;// splitget will convert references to pointers
 	// do not pass a nullptr here
 	assert(p);
@@ -2728,7 +2728,7 @@ RSBD8_FUNC_INLINE auto indirectinput1(V *RSBD8_RESTRICT p, vararguments... varpa
 
 // utility template to retrieve the second-level source
 template<auto indirection1, std::ptrdiff_t indirection2, bool isindexed2, bool isextraparam, typename T, typename... vararguments>
-RSBD8_FUNC_INLINE auto indirectinput2(std::byte const *RSBD8_RESTRICT pintermediate, vararguments... varparameters)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE auto indirectinput2(std::byte const *RSBD8_RESTRICT pintermediate, vararguments... varparameters)noexcept{
 	// do not pass a nullptr here
 	assert(pintermediate);
 
@@ -2758,7 +2758,7 @@ RSBD8_FUNC_INLINE auto indirectinput2(std::byte const *RSBD8_RESTRICT pintermedi
 
 // utility template to pass though results for full outputs
 template<auto indirection1, std::ptrdiff_t indirection2, bool isindexed2, bool isextraparam, typename T, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T>,
 	T> indirectinput2(T passthrough, vararguments...)noexcept{
 	return{passthrough};
@@ -3063,7 +3063,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // Utilities for providing portable bit scan forward functionality
 
 template<typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_integral_v<typename std::conditional_t<std::is_enum_v<T>,
 		std::underlying_type<T>,
@@ -3134,7 +3134,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // Utilities for providing portable rotate left or right by a compile-time constant amount functionality
 
 template<unsigned char amount, typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_integral_v<typename std::conditional_t<std::is_enum_v<T>,
 		std::underlying_type<T>,
@@ -3160,7 +3160,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<unsigned char amount, typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_integral_v<typename std::conditional_t<std::is_enum_v<T>,
 		std::underlying_type<T>,
@@ -3197,7 +3197,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // The initmtsliceswaps* versions are for reversing loops only, and require an even itemsperloop parameter.
 
 template<unsigned itemsperloop>
-RSBD8_FUNC_INLINE std::ptrdiff_t initmtslicemain(std::size_t count, unsigned allowedthreads, unsigned unassignedslice)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::ptrdiff_t initmtslicemain(std::size_t count, unsigned allowedthreads, unsigned unassignedslice)noexcept{
 	// version for the main thread only, for non-reversing loops
 	static_assert(itemsperloop, "itemsperloop must not be zero");
 	assert(allowedthreads);
@@ -3230,7 +3230,7 @@ RSBD8_FUNC_INLINE std::ptrdiff_t initmtslicemain(std::size_t count, unsigned all
 }
 
 template<unsigned itemsperloop>
-RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtslicemt(std::size_t count, unsigned allowedthreads, unsigned assignedslice)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtslicemt(std::size_t count, unsigned allowedthreads, unsigned assignedslice)noexcept{
 	// version for all the supporting threads only, for non-reversing loops
 	static_assert(itemsperloop, "itemsperloop must not be zero");
 	assert(assignedslice);// this part is not designed to handle slice 0, only the code section for the main thread is
@@ -3267,7 +3267,7 @@ RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtslicemt(std::size_t 
 }
 
 template<unsigned itemsperloop>
-RSBD8_FUNC_INLINE std::size_t initmtsliceswapsmain(std::size_t count, unsigned allowedthreads, unsigned unassignedslice)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::size_t initmtsliceswapsmain(std::size_t count, unsigned allowedthreads, unsigned unassignedslice)noexcept{
 	// version for the main thread only, for reversing loops
 	static_assert(itemsperloop, "itemsperloop must not be zero");
 	static_assert(!(1u & itemsperloop), "itemsperloop must be even for reversing loops");
@@ -3292,7 +3292,7 @@ RSBD8_FUNC_INLINE std::size_t initmtsliceswapsmain(std::size_t count, unsigned a
 }
 
 template<unsigned itemsperloop>
-RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtsliceswapsmt(std::size_t count, unsigned allowedthreads, unsigned assignedslice)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtsliceswapsmt(std::size_t count, unsigned allowedthreads, unsigned assignedslice)noexcept{
 	// version for all the supporting threads only, for reversing loops
 	static_assert(itemsperloop, "itemsperloop must not be zero");
 	static_assert(!(1u & itemsperloop), "itemsperloop must be even for reversing loops");
@@ -3337,7 +3337,7 @@ RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtsliceswapsmt(std::si
 // - absolute signed integer, but negative inputs will sort just below their positive counterparts
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<T> &&
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
@@ -3382,7 +3382,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<T> &&
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
@@ -3448,7 +3448,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<T> &&
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
@@ -3553,7 +3553,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -3644,7 +3644,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -3658,7 +3658,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #else// 64-bit and larger systems
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -3764,7 +3764,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -3779,7 +3779,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -3926,7 +3926,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -3942,7 +3942,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #else// 64-bit and larger systems
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -4114,7 +4114,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -4130,7 +4130,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // the variant with 4 items is only used on 64-bit and larger systems
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -4431,7 +4431,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // the variant with 4 items is only used on 64-bit and larger systems
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -4450,7 +4450,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -4533,7 +4533,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -4547,7 +4547,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #else// 64-bit and larger systems
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -4645,7 +4645,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -4660,7 +4660,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -4793,7 +4793,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -4809,7 +4809,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #else// 64-bit and larger systems
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -4969,7 +4969,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -4985,7 +4985,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // the variant with 4 items is only used on 64-bit and larger systems
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -5267,7 +5267,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // the variant with 4 items is only used on 64-bit and larger systems
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -5286,7 +5286,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::size_t filtershiftlo(test128<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::size_t filtershiftlo(test128<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{
 	// filtering is simplified if possible
 	// this should never filter the top 64 bits
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -5334,7 +5334,7 @@ RSBD8_FUNC_INLINE std::size_t filtershiftlo(test128<isabsvalue, issignmode, isfl
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::size_t filtershifthi(test128<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::size_t filtershifthi(test128<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{
 	// filtering is simplified if possible
 	// this should never filter the bottom 64 bits nor the top 8 bits
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -5433,7 +5433,7 @@ RSBD8_FUNC_INLINE std::size_t filtershifthi(test128<isabsvalue, issignmode, isfl
 
 #else// 32-bit or smaller platforms
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::size_t filtershiftlo(test64<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::size_t filtershiftlo(test64<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{
 	// filtering is simplified if possible
 	// this should never filter the top 32 bits
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -5474,7 +5474,7 @@ RSBD8_FUNC_INLINE std::size_t filtershiftlo(test64<isabsvalue, issignmode, isflt
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::size_t filtershifthi(test64<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::size_t filtershifthi(test64<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{
 	// filtering is simplified if possible
 	// this should never filter the bottom 32 bits nor the top 8 bits
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -5552,7 +5552,7 @@ RSBD8_FUNC_INLINE std::size_t filtershifthi(test64<isabsvalue, issignmode, isflt
 #endif
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<T> &&
 	64u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T) &&
@@ -5586,7 +5586,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -5628,7 +5628,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -5643,7 +5643,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -5713,7 +5713,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -5729,7 +5729,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #else// 64-bit and larger systems
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -5779,7 +5779,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -5796,7 +5796,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershiftlo(test128<isabsvalue, issignmode, isfltpmode> cura, test128<isabsvalue, issignmode, isfltpmode> curb, unsigned shift)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershiftlo(test128<isabsvalue, issignmode, isfltpmode> cura, test128<isabsvalue, issignmode, isfltpmode> curb, unsigned shift)noexcept{
 	// filtering is simplified if possible
 	// this should never filter the top 64 bits
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -5870,7 +5870,7 @@ RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershiftlo(test128<isabsvalue, i
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershifthi(test128<isabsvalue, issignmode, isfltpmode> cura, test128<isabsvalue, issignmode, isfltpmode> curb, unsigned shift)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershifthi(test128<isabsvalue, issignmode, isfltpmode> cura, test128<isabsvalue, issignmode, isfltpmode> curb, unsigned shift)noexcept{
 	// filtering is simplified if possible
 	// this should never filter the bottom 64 bits nor the top 8 bits
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -6027,7 +6027,7 @@ RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershifthi(test128<isabsvalue, i
 
 #else// 32-bit or smaller platforms
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershiftlo(test64<isabsvalue, issignmode, isfltpmode> cura, test64<isabsvalue, issignmode, isfltpmode> curb, unsigned shift)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershiftlo(test64<isabsvalue, issignmode, isfltpmode> cura, test64<isabsvalue, issignmode, isfltpmode> curb, unsigned shift)noexcept{
 	// filtering is simplified if possible
 	// this should never filter the top 32 bits
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -6087,7 +6087,7 @@ RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershiftlo(test64<isabsvalue, is
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershifthi(test64<isabsvalue, issignmode, isfltpmode> cura, test64<isabsvalue, issignmode, isfltpmode> curb, unsigned shift)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershifthi(test64<isabsvalue, issignmode, isfltpmode> cura, test64<isabsvalue, issignmode, isfltpmode> curb, unsigned shift)noexcept{
 	// filtering is simplified if possible
 	// this should never filter the bottom 32 bits nor the top 8 bits
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -6211,7 +6211,7 @@ RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershifthi(test64<isabsvalue, is
 #endif
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<T> &&
 	64u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T) &&
@@ -6257,7 +6257,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -6319,7 +6319,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -6335,7 +6335,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -6444,7 +6444,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -6461,7 +6461,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #else// 64-bit and larger systems
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -6534,7 +6534,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -6552,7 +6552,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::array<std::size_t, 4> filtershiftlo(test128<isabsvalue, issignmode, isfltpmode> cura, test128<isabsvalue, issignmode, isfltpmode> curb, test128<isabsvalue, issignmode, isfltpmode> curc, test128<isabsvalue, issignmode, isfltpmode> curd, unsigned shift)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::array<std::size_t, 4> filtershiftlo(test128<isabsvalue, issignmode, isfltpmode> cura, test128<isabsvalue, issignmode, isfltpmode> curb, test128<isabsvalue, issignmode, isfltpmode> curc, test128<isabsvalue, issignmode, isfltpmode> curd, unsigned shift)noexcept{
 	// filtering is simplified if possible
 	// this should never filter the top 64 bits
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -6662,7 +6662,7 @@ RSBD8_FUNC_INLINE std::array<std::size_t, 4> filtershiftlo(test128<isabsvalue, i
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::array<std::size_t, 4> filtershifthi(test128<isabsvalue, issignmode, isfltpmode> cura, test128<isabsvalue, issignmode, isfltpmode> curb, test128<isabsvalue, issignmode, isfltpmode> curc, test128<isabsvalue, issignmode, isfltpmode> curd, unsigned shift)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::array<std::size_t, 4> filtershifthi(test128<isabsvalue, issignmode, isfltpmode> cura, test128<isabsvalue, issignmode, isfltpmode> curb, test128<isabsvalue, issignmode, isfltpmode> curc, test128<isabsvalue, issignmode, isfltpmode> curd, unsigned shift)noexcept{
 	// filtering is simplified if possible
 	// this should never filter the bottom 64 bits nor the top 8 bits
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -6929,7 +6929,7 @@ RSBD8_FUNC_INLINE std::array<std::size_t, 4> filtershifthi(test128<isabsvalue, i
 
 #else// 32-bit or smaller platforms
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::array<std::size_t, 4> filtershiftlo(test64<isabsvalue, issignmode, isfltpmode> cura, test64<isabsvalue, issignmode, isfltpmode> curb, test64<isabsvalue, issignmode, isfltpmode> curc, test64<isabsvalue, issignmode, isfltpmode> curd, unsigned shift)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::array<std::size_t, 4> filtershiftlo(test64<isabsvalue, issignmode, isfltpmode> cura, test64<isabsvalue, issignmode, isfltpmode> curb, test64<isabsvalue, issignmode, isfltpmode> curc, test64<isabsvalue, issignmode, isfltpmode> curd, unsigned shift)noexcept{
 	// filtering is simplified if possible
 	// this should never filter the top 32 bits
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -7023,7 +7023,7 @@ RSBD8_FUNC_INLINE std::array<std::size_t, 4> filtershiftlo(test64<isabsvalue, is
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::array<std::size_t, 4> filtershifthi(test64<isabsvalue, issignmode, isfltpmode> cura, test64<isabsvalue, issignmode, isfltpmode> curb, test64<isabsvalue, issignmode, isfltpmode> curc, test64<isabsvalue, issignmode, isfltpmode> curd, unsigned shift)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::array<std::size_t, 4> filtershifthi(test64<isabsvalue, issignmode, isfltpmode> cura, test64<isabsvalue, issignmode, isfltpmode> curb, test64<isabsvalue, issignmode, isfltpmode> curc, test64<isabsvalue, issignmode, isfltpmode> curd, unsigned shift)noexcept{
 	// filtering is simplified if possible
 	// this should never filter the bottom 32 bits nor the top 8 bits
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -7233,7 +7233,7 @@ RSBD8_FUNC_INLINE std::array<std::size_t, 4> filtershifthi(test64<isabsvalue, is
 #endif
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<T> &&
 	64u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T) &&
@@ -7308,7 +7308,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 // the variant with 4 items is only used on 64-bit and larger systems
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -7428,7 +7428,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // the variant with 4 items is only used on 64-bit and larger systems
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -11521,7 +11521,7 @@ struct autoaccumulateoffsetsarrays{
 
 // version for both threads when multithreading is used at run time (writes a full set of offsets in this case)
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X, unsigned setradix>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
 	unsigned> generateoffsetshelpernotshared(std::size_t count, X *RSBD8_RESTRICT offsets)noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -11709,7 +11709,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // version for the companion thread (writes half a set of offsets in this case)
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X, unsigned setradix>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
 	unsigned> generateoffsetssinglemtc(std::size_t count, X *RSBD8_RESTRICT offsets)noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -11815,7 +11815,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // version for the main thread when multithreading is used (writes half a set of offsets in this case)
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X, unsigned setradix>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
 	unsigned> generateoffsetssinglehelpermain(std::size_t count, X *RSBD8_RESTRICT offsets)noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -11924,7 +11924,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // version for the main thread when no multithreading is used at run time
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X, unsigned setradix>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
 	unsigned> generateoffsetssinglehelperst(std::size_t count, X *RSBD8_RESTRICT offsets)noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -12131,7 +12131,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // version for the main thread when no multithreading is used at compile time
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X, unsigned setradix>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	128u >= CHAR_BIT * sizeof(T),
 	unsigned> generateoffsetssinglemain(std::size_t count, X *RSBD8_RESTRICT offsets)noexcept{
@@ -12340,7 +12340,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // version for the main thread when multithreading is used at compile time
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X, unsigned setradix>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	128u >= CHAR_BIT * sizeof(T),
 	unsigned> generateoffsetssinglemain(std::size_t count, X *RSBD8_RESTRICT offsets, unsigned usemultithread)noexcept{
@@ -12357,7 +12357,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // version specific for writing the lower half when multithreading is used (writes half a set of offsets in this case)
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X, unsigned setradix>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
 	unsigned> generateoffsetshelpersharedlowerhalf(std::size_t count, X *RSBD8_RESTRICT offsets)noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -12374,7 +12374,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // version specific for writing the upper half when multithreading is used (writes half a set of offsets in this case)
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X, unsigned setradix>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
 	unsigned> generateoffsetshelpersharedupperhalf(std::size_t count, X *RSBD8_RESTRICT offsets)noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -12391,7 +12391,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // version for the companion thread
 template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
@@ -12529,7 +12529,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // version for the main thread when multithreading is used at compile time
 template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
@@ -12759,7 +12759,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // version for the main thread when no multithreading is used at compile time
 template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
@@ -12848,7 +12848,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // function to establish the initial treshold for 2-way multithreading
 // this is the only version that allows 8-bit inputs
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, bool isindirect>
-RSBD8_FUNC_INLINE constexpr std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
@@ -12930,7 +12930,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 
 // function to establish the initial treshold for 4-way multithreading
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_INLINE constexpr std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
@@ -12984,7 +12984,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 
 // function to establish the initial treshold for 6-way multithreading
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_INLINE constexpr std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
@@ -13038,7 +13038,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 
 // function to establish the initial treshold for 8-way multithreading
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_INLINE constexpr std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
@@ -13073,7 +13073,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 
 // function to establish the initial treshold for 16-way multithreading
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_INLINE constexpr std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
@@ -52291,7 +52291,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // Nothing will be processed when using these on unfiltered integer inputs.
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -52480,7 +52480,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>,
@@ -52505,7 +52505,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -52834,7 +52834,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
@@ -52861,7 +52861,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
@@ -53323,7 +53323,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
@@ -53352,7 +53352,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>> &&
 	std::is_same_v<U, test128<isabsvalue, issignmode, isfltpmode>>,
 	test128<isabsvalue, issignmode, isfltpmode>> convertinput(U cur)noexcept{
@@ -53455,7 +53455,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>> &&
 	std::is_same_v<U, test128<isabsvalue, issignmode, isfltpmode>>,
 	std::array<test128<isabsvalue, issignmode, isfltpmode>, 2>> convertinput(U cura, U curb)noexcept{
@@ -53620,7 +53620,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>> &&
 	std::is_same_v<U, test128<isabsvalue, issignmode, isfltpmode>>,
 	std::array<test128<isabsvalue, issignmode, isfltpmode>, 3>> convertinput(U cura, U curb, U curc)noexcept{
@@ -53847,7 +53847,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 #else// 32-bit or smaller platforms
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>> &&
 	std::is_same_v<U, test64<isabsvalue, issignmode, isfltpmode>>,
 	test64<isabsvalue, issignmode, isfltpmode>> convertinput(U cur)noexcept{
@@ -53928,7 +53928,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>> &&
 	std::is_same_v<U, test64<isabsvalue, issignmode, isfltpmode>>,
 	std::array<test64<isabsvalue, issignmode, isfltpmode>, 2>> convertinput(U cura, U curb)noexcept{
@@ -54057,7 +54057,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>> &&
 	std::is_same_v<U, test64<isabsvalue, issignmode, isfltpmode>>,
 	std::array<test64<isabsvalue, issignmode, isfltpmode>, 3>> convertinput(U cura, U curb, U curc)noexcept{
@@ -54234,7 +54234,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_integral_v<T> &&
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_integral_v<U> &&
@@ -54272,7 +54272,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_integral_v<T> &&
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_integral_v<U> &&
@@ -54328,7 +54328,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_integral_v<T> &&
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_integral_v<U> &&
