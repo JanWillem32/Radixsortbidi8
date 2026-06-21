@@ -71,6 +71,7 @@
 // - Reroutes to the 1- or 2-thread functions for single-part types
 // - Reroutes to the 1- or 2-thread functions (variants without indirection)
 // - Reroutes to the 1- or 2-thread functions (variants with indirection)
+// - Helper class to safely moderate a std::future<std::future<void>> item on the stack
 // - Helper functions for converting inputs to perform unsigned comparisons in a final merging phase
 // - Helper functions for merging the halves from multithreading inputs without indirection
 // - Up to 4-way multithreading functions without indirection
@@ -13652,7 +13653,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if(!old) do RSBD8_LIKELY{
 			spinpause();
-		}while(atomiclightbarrier.load(std::memory_order_relaxed));
+		}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 	}
 	if((offsetsloopcount<T> - 2u) * typeradix<T> == shifter)RSBD8_UNLIKELY goto handlebelowtop;// rare, but possible
 	if((offsetsloopcount<T> - 2u) * typeradix<T> < shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
@@ -13734,7 +13735,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 		}
 		// handle the top two parts differently
 		if(offsetsloopcountsplitup<T> * typeradix<T> <= shifter)RSBD8_UNLIKELY{
@@ -13803,7 +13804,7 @@ handlebelowtop:
 					psrchi += count;
 					if(!old) do RSBD8_LIKELY{
 						spinpause();
-					}while(atomiclightbarrier.load(std::memory_order_relaxed));
+					}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 				}
 			}
 handletop:
@@ -13976,7 +13977,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 			spinpause();
-		}while(atomiclightbarrier.load(std::memory_order_relaxed));
+		}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 	}
 	// also compensate for the remainder radix difference
 	shifter -= 32u + typeradix<T> - typeradixremainder<T>;
@@ -14123,7 +14124,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 		}
 		// handle the top two parts differently
 		if(offsetsloopcountsplitup<T> * typeradix<T> <= shifter)RSBD8_UNLIKELY{
@@ -14285,7 +14286,7 @@ handlebelowtop:
 				// unused: pdstnext = psrclo;
 				if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
+				}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 			}
 handletop:
 			if constexpr(ismultithreadcapable){
@@ -14471,7 +14472,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(atomiclightbarrier.load(std::memory_order_relaxed));
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -14944,7 +14945,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, 0u)};
@@ -15018,7 +15019,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(atomiclightbarrier.load(std::memory_order_relaxed));
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -15572,7 +15573,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, movetobuffer)};
@@ -16179,15 +16180,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		runsteps >>= index;
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
-		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-			if(!old) do RSBD8_LIKELY{
-				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
-		}else{// detect exceptions
-			if(!old) do RSBD8_LIKELY{
-				spinpause();
-				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(~std::uintptr_t{} == old);
+		if(!old) do RSBD8_LIKELY{
+			spinpause();
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 		}
 	}
@@ -16287,15 +16284,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			runsteps >>= index;
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 			}
 		}
@@ -16382,15 +16375,11 @@ handlebelowtop:
 					pdst = pdstnext;
 					// unused: pdstnext = psrchi;
 					psrchi += count;
-					if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-						if(!old) do RSBD8_LIKELY{
-							spinpause();
-						}while(atomiclightbarrier.load(std::memory_order_relaxed));
-					}else{// detect exceptions
-						if(!old) do RSBD8_LIKELY{
-							spinpause();
-							old = atomiclightbarrier.load(std::memory_order_relaxed);
-						}while(~std::uintptr_t{} == old);
+					if(!old) do RSBD8_LIKELY{
+						spinpause();
+						old = atomiclightbarrier.load(std::memory_order_relaxed);
+					}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 					}
 				}
@@ -16627,15 +16616,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable){
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 			}
 		}
@@ -16869,15 +16854,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-					if(!old) do RSBD8_LIKELY{
-						spinpause();
-					}while(atomiclightbarrier.load(std::memory_order_relaxed));
-				}else{// detect exceptions
-					if(!old) do RSBD8_LIKELY{
-						spinpause();
-						old = atomiclightbarrier.load(std::memory_order_relaxed);
-					}while(~std::uintptr_t{} == old);
+				if(!old) do RSBD8_LIKELY{
+					spinpause();
+					old = atomiclightbarrier.load(std::memory_order_relaxed);
+				}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the companion thread will never set it to one
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 				}
 			}
@@ -17112,15 +17093,11 @@ handlebelowtop:
 					pdst = pdstnext;
 					// unused: pdstnext = psrclo;
 					if constexpr(ismultithreadcapable){
-						if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-							if(!old) do RSBD8_LIKELY{
-								spinpause();
-							}while(atomiclightbarrier.load(std::memory_order_relaxed));
-						}else{// detect exceptions
-							if(!old) do RSBD8_LIKELY{
-								spinpause();
-								old = atomiclightbarrier.load(std::memory_order_relaxed);
-							}while(~std::uintptr_t{} == old);
+						if(!old) do RSBD8_LIKELY{
+							spinpause();
+							old = atomiclightbarrier.load(std::memory_order_relaxed);
+						}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the companion thread will never set it to one
+						if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 							if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 						}
 					}
@@ -17382,16 +17359,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// first barrier
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
-	if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-		}while(atomiclightbarrier.load(std::memory_order_relaxed));
-	}else{// detect exceptions
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-			old = atomiclightbarrier.load(std::memory_order_relaxed);
-		}while(~std::uintptr_t{} == old);
-		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+	if(!old) do RSBD8_LIKELY{
+		spinpause();
+		old = atomiclightbarrier.load(std::memory_order_relaxed);
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
 
 	// transform counts into base offsets
@@ -18079,16 +18052,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		unsigned runsteps, paritybool;
 		if constexpr(ismultithreadcapable){// first barrier
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -18166,16 +18135,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// first barrier
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
-	if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-		}while(atomiclightbarrier.load(std::memory_order_relaxed));
-	}else{// detect exceptions
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-			old = atomiclightbarrier.load(std::memory_order_relaxed);
-		}while(~std::uintptr_t{} == old);
-		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+	if(!old) do RSBD8_LIKELY{
+		spinpause();
+		old = atomiclightbarrier.load(std::memory_order_relaxed);
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
 
 	// transform counts into base offsets
@@ -18956,16 +18921,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		unsigned runsteps, paritybool;
 		if constexpr(ismultithreadcapable){// first barrier
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -19446,7 +19407,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if(!old) do RSBD8_LIKELY{
 			spinpause();
-		}while(atomiclightbarrier.load(std::memory_order_relaxed));
+		}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 	}
 	if constexpr(!isabsvalue && isfltpmode) if(128u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	// also compensate for the remainder radix difference
@@ -19493,7 +19454,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 		}
 		// handle the top part for floating-point differently
 		if(!isabsvalue && isfltpmode && typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
@@ -19634,7 +19595,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 			spinpause();
-		}while(atomiclightbarrier.load(std::memory_order_relaxed));
+		}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 	}
 	if constexpr(!isabsvalue && isfltpmode) if(128u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	// also compensate for the remainder radix difference
@@ -19718,7 +19679,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 		}
 		// handle the top part for floating-point differently
 		if(!isabsvalue && isfltpmode && typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
@@ -19816,7 +19777,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(atomiclightbarrier.load(std::memory_order_relaxed));
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -20259,7 +20220,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, 0u)};
@@ -20330,7 +20291,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(atomiclightbarrier.load(std::memory_order_relaxed));
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -20779,7 +20740,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, movetobuffer)};
@@ -21278,15 +21239,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		runsteps >>= index;
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
-		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-			if(!old) do RSBD8_LIKELY{
-				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
-		}else{// detect exceptions
-			if(!old) do RSBD8_LIKELY{
-				spinpause();
-				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(~std::uintptr_t{} == old);
+		if(!old) do RSBD8_LIKELY{
+			spinpause();
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 		}
 	}
@@ -21355,15 +21312,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			runsteps >>= index;
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 			}
 		}
@@ -21607,15 +21560,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable){
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 			}
 		}
@@ -21779,15 +21728,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-					if(!old) do RSBD8_LIKELY{
-						spinpause();
-					}while(atomiclightbarrier.load(std::memory_order_relaxed));
-				}else{// detect exceptions
-					if(!old) do RSBD8_LIKELY{
-						spinpause();
-						old = atomiclightbarrier.load(std::memory_order_relaxed);
-					}while(~std::uintptr_t{} == old);
+				if(!old) do RSBD8_LIKELY{
+					spinpause();
+					old = atomiclightbarrier.load(std::memory_order_relaxed);
+				}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the companion thread will never set it to one
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 				}
 			}
@@ -21969,16 +21914,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// first barrier
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
-	if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-		}while(atomiclightbarrier.load(std::memory_order_relaxed));
-	}else{// detect exceptions
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-			old = atomiclightbarrier.load(std::memory_order_relaxed);
-		}while(~std::uintptr_t{} == old);
-		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+	if(!old) do RSBD8_LIKELY{
+		spinpause();
+		old = atomiclightbarrier.load(std::memory_order_relaxed);
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
 
 	// transform counts into base offsets
@@ -22607,16 +22548,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		unsigned runsteps, paritybool;
 		if constexpr(ismultithreadcapable){// first barrier
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -22690,16 +22627,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// first barrier
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
-	if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-		}while(atomiclightbarrier.load(std::memory_order_relaxed));
-	}else{// detect exceptions
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-			old = atomiclightbarrier.load(std::memory_order_relaxed);
-		}while(~std::uintptr_t{} == old);
-		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+	if(!old) do RSBD8_LIKELY{
+		spinpause();
+		old = atomiclightbarrier.load(std::memory_order_relaxed);
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
 
 	// transform counts into base offsets
@@ -23326,16 +23259,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		unsigned runsteps, paritybool;
 		if constexpr(ismultithreadcapable){// first barrier
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -24031,7 +23960,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if(!old) do RSBD8_LIKELY{
 			spinpause();
-		}while(atomiclightbarrier.load(std::memory_order_relaxed));
+		}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 	}
 	if constexpr(!isabsvalue && isfltpmode) if(64u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	// also compensate for the remainder radix difference
@@ -24089,7 +24018,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 		}
 		// handle the top part for floating-point differently
 		if(!isabsvalue && isfltpmode && typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
@@ -24256,7 +24185,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 			spinpause();
-		}while(atomiclightbarrier.load(std::memory_order_relaxed));
+		}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 	}
 	if constexpr(!isabsvalue && isfltpmode) if(64u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	// also compensate for the remainder radix difference
@@ -24353,7 +24282,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 		}
 		// handle the top part for floating-point differently
 		if(!isabsvalue && isfltpmode && typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
@@ -24464,7 +24393,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(atomiclightbarrier.load(std::memory_order_relaxed));
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -24933,7 +24862,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, 0u)};
@@ -25004,7 +24933,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(atomiclightbarrier.load(std::memory_order_relaxed));
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -25568,7 +25497,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, movetobuffer)};
@@ -26311,15 +26240,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		runsteps >>= index;
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
-		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-			if(!old) do RSBD8_LIKELY{
-				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
-		}else{// detect exceptions
-			if(!old) do RSBD8_LIKELY{
-				spinpause();
-				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(~std::uintptr_t{} == old);
+		if(!old) do RSBD8_LIKELY{
+			spinpause();
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 		}
 	}
@@ -26413,15 +26338,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			runsteps >>= index;
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 			}
 		}
@@ -26734,15 +26655,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable){
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 			}
 		}
@@ -26948,15 +26865,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-					if(!old) do RSBD8_LIKELY{
-						spinpause();
-					}while(atomiclightbarrier.load(std::memory_order_relaxed));
-				}else{// detect exceptions
-					if(!old) do RSBD8_LIKELY{
-						spinpause();
-						old = atomiclightbarrier.load(std::memory_order_relaxed);
-					}while(~std::uintptr_t{} == old);
+				if(!old) do RSBD8_LIKELY{
+					spinpause();
+					old = atomiclightbarrier.load(std::memory_order_relaxed);
+				}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the companion thread will never set it to one
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 				}
 			}
@@ -27178,16 +27091,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// first barrier
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
-	if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-		}while(atomiclightbarrier.load(std::memory_order_relaxed));
-	}else{// detect exceptions
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-			old = atomiclightbarrier.load(std::memory_order_relaxed);
-		}while(~std::uintptr_t{} == old);
-		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+	if(!old) do RSBD8_LIKELY{
+		spinpause();
+		old = atomiclightbarrier.load(std::memory_order_relaxed);
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
 
 	// transform counts into base offsets
@@ -27918,16 +27827,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		unsigned runsteps, paritybool;
 		if constexpr(ismultithreadcapable){// first barrier
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -28004,16 +27909,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// first barrier
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
-	if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-		}while(atomiclightbarrier.load(std::memory_order_relaxed));
-	}else{// detect exceptions
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-			old = atomiclightbarrier.load(std::memory_order_relaxed);
-		}while(~std::uintptr_t{} == old);
-		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+	if(!old) do RSBD8_LIKELY{
+		spinpause();
+		old = atomiclightbarrier.load(std::memory_order_relaxed);
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
 
 	// transform counts into base offsets
@@ -28850,16 +28751,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		unsigned runsteps, paritybool;
 		if constexpr(ismultithreadcapable){// first barrier
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -31728,7 +31625,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 		}
 		// handle the top part for floating-point differently
 		if(!isabsvalue && isfltpmode && typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
@@ -31896,7 +31793,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 		}
 		// handle the top part for floating-point differently
 		if(!isabsvalue && isfltpmode && typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
@@ -32011,7 +31908,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(atomiclightbarrier.load(std::memory_order_relaxed));
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -33991,7 +33888,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, 0u)};
@@ -34066,7 +33963,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(atomiclightbarrier.load(std::memory_order_relaxed));
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -36699,7 +36596,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, movetobuffer)};
@@ -39830,15 +39727,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				shifter += index * typeradix<T>;
 				poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			}
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 			}
 		}
@@ -40149,15 +40042,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			}
 			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-					if(!old) do RSBD8_LIKELY{
-						spinpause();
-					}while(atomiclightbarrier.load(std::memory_order_relaxed));
-				}else{// detect exceptions
-					if(!old) do RSBD8_LIKELY{
-						spinpause();
-						old = atomiclightbarrier.load(std::memory_order_relaxed);
-					}while(~std::uintptr_t{} == old);
+				if(!old) do RSBD8_LIKELY{
+					spinpause();
+					old = atomiclightbarrier.load(std::memory_order_relaxed);
+				}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the companion thread will never set it to one
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 				}
 			}
@@ -40382,16 +40271,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// first barrier
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
-	if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-		}while(atomiclightbarrier.load(std::memory_order_relaxed));
-	}else{// detect exceptions
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-			old = atomiclightbarrier.load(std::memory_order_relaxed);
-		}while(~std::uintptr_t{} == old);
-		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+	if(!old) do RSBD8_LIKELY{
+		spinpause();
+		old = atomiclightbarrier.load(std::memory_order_relaxed);
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
 
 	// transform counts into base offsets
@@ -43908,16 +43793,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		unsigned runsteps, paritybool;
 		if constexpr(ismultithreadcapable){// first barrier
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -43995,16 +43876,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// first barrier
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
-	if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-		}while(atomiclightbarrier.load(std::memory_order_relaxed));
-	}else{// detect exceptions
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-			old = atomiclightbarrier.load(std::memory_order_relaxed);
-		}while(~std::uintptr_t{} == old);
-		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+	if(!old) do RSBD8_LIKELY{
+		spinpause();
+		old = atomiclightbarrier.load(std::memory_order_relaxed);
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
 
 	// transform counts into base offsets
@@ -48239,16 +48116,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		unsigned runsteps, paritybool;
 		if constexpr(ismultithreadcapable){// first barrier
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -49004,7 +48877,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(atomiclightbarrier.load(std::memory_order_relaxed));
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -49060,7 +48933,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(atomiclightbarrier.load(std::memory_order_relaxed));
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 
 	// the single-part version without indirection here only has to do a linear fill based on the offsets, making this simpler than any other version
 	// process the actual sorting-by-filling sequence
@@ -49316,7 +49189,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			allareidentical = generateoffsetssinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, offsets.data(), usemultithread);
@@ -49538,7 +49411,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 		}
 
 		// the single-part version without indirection here only has to do a linear fill based on the offsets, making this simpler than any other version
@@ -49577,7 +49450,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(atomiclightbarrier.load(std::memory_order_relaxed));
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -49631,7 +49504,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(atomiclightbarrier.load(std::memory_order_relaxed));
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
 
 	// the single-part version without indirection here only has to do a linear fill based on the offsets, making this simpler than any other version
 	// process the actual sorting-by-filling sequence
@@ -49889,7 +49762,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			allareidentical = generateoffsetssinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, offsets.data(), usemultithread);
@@ -50103,7 +49976,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
 		}
 
 		// the single-part version without indirection here only has to do a linear fill based on the offsets, making this simpler than any other version
@@ -50631,16 +50504,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// first barrier
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
-	if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-		}while(atomiclightbarrier.load(std::memory_order_relaxed));
-	}else{// detect exceptions
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-			old = atomiclightbarrier.load(std::memory_order_relaxed);
-		}while(~std::uintptr_t{} == old);
-		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+	if(!old) do RSBD8_LIKELY{
+		spinpause();
+		old = atomiclightbarrier.load(std::memory_order_relaxed);
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
 
 	// transform counts into base offsets
@@ -51029,16 +50898,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		unsigned allareidentical;
 		if constexpr(ismultithreadcapable){// first barrier
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -51098,16 +50963,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// first barrier
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
-	if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-		}while(atomiclightbarrier.load(std::memory_order_relaxed));
-	}else{// detect exceptions
-		if(!old) do RSBD8_LIKELY{
-			spinpause();
-			old = atomiclightbarrier.load(std::memory_order_relaxed);
-		}while(~std::uintptr_t{} == old);
-		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+	if(!old) do RSBD8_LIKELY{
+		spinpause();
+		old = atomiclightbarrier.load(std::memory_order_relaxed);
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
 
 	// transform counts into base offsets
@@ -51498,16 +51359,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		unsigned allareidentical;
 		if constexpr(ismultithreadcapable){// first barrier
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do RSBD8_LIKELY{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+			if(!old) do RSBD8_LIKELY{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -52284,6 +52141,45 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 }
 #endif
+
+// Helper class to safely moderate a std::future<std::future<void>> item on the stack
+
+// this class is a simple RAII wrapper to specifically use some space in a pre-allocated array instead of on the stack
+class autowrapfutureonfuture{
+	std::future<std::future<void>> *RSBD8_RESTRICT pfutureonfuture;// this class expects the incoming space to be uninitialised
+
+public:
+	RSBD8_FUNC_INLINE ~autowrapfutureonfuture()noexcept{
+		if(pfutureonfuture) pfutureonfuture->~future();// destroy it safely, this will block until all tasks are completed
+	}
+	// disable copy and move mechanisms
+	autowrapfutureonfuture(autowrapfutureonfuture const &) = delete;
+	autowrapfutureonfuture &operator=(autowrapfutureonfuture const &) = delete;
+	RSBD8_FUNC_INLINE autowrapfutureonfuture()noexcept : pfutureonfuture{}{}
+	RSBD8_FUNC_INLINE autowrapfutureonfuture(void *RSBD8_RESTRICT pempty)noexcept{
+		// do not pass a nullptr here
+		assert(pempty);
+
+		// this class expects the incoming space to be uninitialised
+		static_assert(sizeof(std::future<std::future<void>>) <= 2u * sizeof(std::future<void>), "unexpected size of std::future<std::future<void>>");
+		pfutureonfuture = new(pempty) std::future<std::future<void>>;
+	}
+	RSBD8_FUNC_INLINE void assignspace(void *RSBD8_RESTRICT pempty)noexcept{
+		assert(!pfutureonfuture);
+		// do not pass a nullptr here
+		assert(pempty);
+
+		// this class expects the incoming space to be uninitialised
+		static_assert(sizeof(std::future<std::future<void>>) <= 2u * sizeof(std::future<void>), "unexpected size of std::future<std::future<void>>");
+		pfutureonfuture = new(pempty) std::future<std::future<void>>;
+	}
+	RSBD8_FUNC_INLINE autowrapfutureonfuture &operator=(std::future<std::future<void>> &&object)noexcept{
+		assert(pfutureonfuture);// use the non-trivial initialiser or assignspace() before assignment
+
+		*pfutureonfuture = std::move(object);
+		return{*this};
+	}
+};
 
 // Helper functions for converting inputs to perform unsigned comparisons in a final merging phase
 //
@@ -55078,7 +54974,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 		std::future<void> asyncreturnhandle;
 		{
-			std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+			autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			if(3u < allowedthreads && limit4way <= count){// 4-way limit
 #endif
@@ -55111,8 +55007,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 				unsigned allowedthreadstemp{allowedthreads >> 1};
 				assert(1u < allowedthreadstemp);// each of the two parts will use at least two threads
+				indexsizeofpcall *= allowedthreadstemp;
 				std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
-				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + allowedthreadstemp * indexsizeofpcall};
+				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
+				asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 				try{
 					// process the upper half (rounded up) separately if possible
 					asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount);
@@ -55246,7 +55144,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 		std::future<void> asyncreturnhandle;
 		{
-			std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+			autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			if(3u < allowedthreads && limit4way <= count){// 4-way limit
 #endif
@@ -55279,11 +55177,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 				unsigned allowedthreadstemp{allowedthreads >> 1};
 				assert(1u < allowedthreadstemp);// each of the two parts will use at least two threads
+				indexsizeofpcall *= allowedthreadstemp;
 				std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
-				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + allowedthreadstemp * indexsizeofpcall};
+				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
+				asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 				try{
 					// process the upper half (rounded up) separately if possible
-					asynchandle = std::async(std::launch::deferred, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer);
+					asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer);
 					pcall = pcallsmaller;
 					allowedthreads = allowedthreadstemp;
 					movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
@@ -56468,7 +56368,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
 		std::future<void> asyncreturnhandle;
 		{
-			std::future<std::future<void>> asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
+			autowrapfutureonfuture asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
 			static std::size_t constexpr limit6way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 				base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -56508,15 +56408,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 				unsigned allowedthreadstemp{allowedthreads / 3u};
 				assert(1u < allowedthreadstemp);// each of the three parts will use at least two threads
+				indexsizeofpcall *= allowedthreadstemp;
 				std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
-				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + allowedthreadstemp * indexsizeofpcall};
+				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
+				asynchandlemid.assignspace(pfuturesiter - 2);// use the otherwise unused space
 				try{
 					// process the middle third (rounded in between) separately if possible
 					asynchandlemid = std::async(std::launch::async, pcallsmaller, thirdcountmid, allowedthreadstemp, pfuturesiter, pindicesiter, input + thirdcount, buffer + thirdcount, output + thirdcount);
 					pcall = pcallsmaller;
 					allowedthreads = allowedthreadstemp;
-					pfuturesiter += allowedthreadstemp - 2u;
-					pindicesiter += allowedthreadstemp * indexsizeofpcall;
+					pfuturesiter += allowedthreadstemp;// 2 unused slots per split
+					pindicesiter += indexsizeofpcall;
+					asynchandletop.assignspace(pfuturesiter - 2);// use the otherwise unused space
 					std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 					finalcount = thirdcount;
 					try{
@@ -56626,7 +56529,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
 		std::future<void> asyncreturnhandle;
 		{
-			std::future<std::future<void>> asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
+			autowrapfutureonfuture asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
 			static std::size_t constexpr limit6way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 				base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -56666,15 +56569,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 				unsigned allowedthreadstemp{allowedthreads / 3u};
 				assert(1u < allowedthreadstemp);// each of the three parts will use at least two threads
+				indexsizeofpcall *= allowedthreadstemp;
 				std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
-				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + allowedthreadstemp * indexsizeofpcall};
+				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
+				asynchandlemid.assignspace(pfuturesiter - 2);// use the otherwise unused space
 				try{
 					// process the middle third (rounded in between) separately if possible
 					asynchandlemid = std::async(std::launch::async, pcallsmaller, thirdcountmid, allowedthreadstemp, pfuturesiter, pindicesiter, input + thirdcount, buffer + thirdcount, !movetobuffer);
 					pcall = pcallsmaller;
 					allowedthreads = allowedthreadstemp;
-					pfuturesiter += allowedthreadstemp - 2u;
-					pindicesiter += allowedthreadstemp * indexsizeofpcall;
+					pfuturesiter += allowedthreadstemp;// 2 unused slots per split
+					pindicesiter += indexsizeofpcall;
+					asynchandletop.assignspace(pfuturesiter - 2);// use the otherwise unused space
 					movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 					finalcount = thirdcount;
 					try{
@@ -56825,7 +56731,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			std::future<void> asyncreturnhandle;
 			{
-				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+				autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				if(7u < allowedthreads && limit8way <= count){// 8-way limit
 #endif
@@ -56858,8 +56764,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 					unsigned allowedthreadstemp{allowedthreads >> 1};
 					assert(1u < allowedthreadstemp);// each of the two parts will use at least two threads
+					indexsizeofpcall *= allowedthreadstemp;
 					std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
-					std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + allowedthreadstemp * indexsizeofpcall};
+					std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
+					asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 					try{
 						// process the upper half (rounded up) separately if possible
 						asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount);
@@ -57021,7 +56929,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				std::future<void> asyncreturnhandle;
 				{
-					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+					autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 					if(7u < allowedthreads && limit8way <= count){// 8-way limit
 #endif
@@ -57054,8 +56962,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 						unsigned allowedthreadstemp{allowedthreads >> 1};
 						assert(1u < allowedthreadstemp);// each of the two parts will use at least two threads
+						indexsizeofpcall *= allowedthreadstemp;
 						std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
-						std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + allowedthreadstemp * indexsizeofpcall};
+						std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
+						asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 						try{
 							// process the upper half (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer);
@@ -57218,7 +57128,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				std::future<void> asyncreturnhandle;
 				{
-					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+					autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 					if(15u < allowedthreads && limit16way <= count){// 16-way limit
 						std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 						std::size_t const halfcount{count >> 1};// rounded down
@@ -57249,8 +57159,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 						unsigned allowedthreadstemp{allowedthreads >> 1};
 						assert(1u < allowedthreadstemp);// each of the two parts will use at least two threads
+						indexsizeofpcall *= allowedthreadstemp;
 						std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
-						std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + allowedthreadstemp * indexsizeofpcall};
+						std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
+						asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 						try{
 							// process the upper half (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount);
@@ -57414,7 +57326,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				std::future<void> asyncreturnhandle;
 				{
-					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+					autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 					if(15u < allowedthreads && limit16way <= count){// 16-way limit
 						std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 						std::size_t const halfcount{count >> 1};// rounded down
@@ -57445,8 +57357,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 						unsigned allowedthreadstemp{allowedthreads >> 1};
 						assert(1u < allowedthreadstemp);// each of the two parts will use at least two threads
+						indexsizeofpcall *= allowedthreadstemp;
 						std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
-						std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + allowedthreadstemp * indexsizeofpcall};
+						std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
+						asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 						try{
 							// process the upper half (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer);
@@ -58033,7 +57947,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 		std::future<void> asyncreturnhandle;
 		{
-			std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+			autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			if(3u < allowedthreads && limit4way <= count){// 4-way limit
 #endif
@@ -58066,8 +57980,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 				unsigned allowedthreadstemp{allowedthreads >> 1};
 				assert(1u < allowedthreadstemp);// each of the two parts will use at least two threads
+				indexsizeofpcall *= allowedthreadstemp;
 				std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
-				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + allowedthreadstemp * indexsizeofpcall};
+				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
+				asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 				try{
 					// process the upper half (rounded up) separately if possible
 					asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
@@ -58193,7 +58109,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 		std::future<void> asyncreturnhandle;
 		{
-			std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+			autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			if(3u < allowedthreads && limit4way <= count){// 4-way limit
 #endif
@@ -58226,8 +58142,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 				unsigned allowedthreadstemp{allowedthreads >> 1};
 				assert(1u < allowedthreadstemp);// each of the two parts will use at least two threads
+				indexsizeofpcall *= allowedthreadstemp;
 				std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
-				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + allowedthreadstemp * indexsizeofpcall};
+				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
+				asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 				try{
 					// process the upper half (rounded up) separately if possible
 					asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
@@ -59139,7 +59057,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
 		std::future<void> asyncreturnhandle;
 		{
-			std::future<std::future<void>> asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
+			autowrapfutureonfuture asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
 			static std::size_t constexpr limit6way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 				base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -59179,15 +59097,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 				unsigned allowedthreadstemp{allowedthreads / 3u};
 				assert(1u < allowedthreadstemp);// each of the three parts will use at least two threads
+				indexsizeofpcall *= allowedthreadstemp;
 				std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
-				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + allowedthreadstemp * indexsizeofpcall};
+				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
+				asynchandlemid.assignspace(pfuturesiter - 2);// use the otherwise unused space
 				try{
 					// process the middle third (rounded in between) separately if possible
 					asynchandlemid = std::async(std::launch::async, pcallsmaller, thirdcountmid, allowedthreadstemp, pfuturesiter, pindicesiter, input + thirdcount, buffer + thirdcount, output + thirdcount, varparameters...);
 					pcall = pcallsmaller;
 					allowedthreads = allowedthreadstemp;
-					pfuturesiter += allowedthreadstemp - 2u;
-					pindicesiter += allowedthreadstemp * indexsizeofpcall;
+					pfuturesiter += allowedthreadstemp;// 2 unused slots per split
+					pindicesiter += indexsizeofpcall;
+					asynchandletop.assignspace(pfuturesiter - 2);// use the otherwise unused space
 					std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 					finalcount = thirdcount;
 					try{
@@ -59296,7 +59217,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
 		std::future<void> asyncreturnhandle;
 		{
-			std::future<std::future<void>> asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
+			autowrapfutureonfuture asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
 			static std::size_t constexpr limit6way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 				base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -59336,15 +59257,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 				unsigned allowedthreadstemp{allowedthreads / 3u};
 				assert(1u < allowedthreadstemp);// each of the three parts will use at least two threads
+				indexsizeofpcall *= allowedthreadstemp;
 				std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
-				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + allowedthreadstemp * indexsizeofpcall};
+				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
+				asynchandlemid.assignspace(pfuturesiter - 2);// use the otherwise unused space
 				try{
 					// process the middle third (rounded in between) separately if possible
 					asynchandlemid = std::async(std::launch::async, pcallsmaller, thirdcountmid, allowedthreadstemp, pfuturesiter, pindicesiter, input + thirdcount, buffer + thirdcount, !movetobuffer, varparameters...);
 					pcall = pcallsmaller;
 					allowedthreads = allowedthreadstemp;
-					pfuturesiter += allowedthreadstemp - 2u;
-					pindicesiter += allowedthreadstemp * indexsizeofpcall;
+					pfuturesiter += allowedthreadstemp;// 2 unused slots per split
+					pindicesiter += indexsizeofpcall;
+					asynchandletop.assignspace(pfuturesiter - 2);// use the otherwise unused space
 					movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 					finalcount = thirdcount;
 					try{
@@ -59489,7 +59413,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			std::future<void> asyncreturnhandle;
 			{
-				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+				autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				if(7u < allowedthreads && limit8way <= count){// 8-way limit
 #endif
@@ -59522,8 +59446,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 					unsigned allowedthreadstemp{allowedthreads >> 1};
 					assert(1u < allowedthreadstemp);// each of the two parts will use at least two threads
+					indexsizeofpcall *= allowedthreadstemp;
 					std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
-					std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + allowedthreadstemp * indexsizeofpcall};
+					std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
+					asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 					try{
 						// process the upper half (rounded up) separately if possible
 						asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
@@ -59677,7 +59603,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			std::future<void> asyncreturnhandle;
 			{
-				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+				autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				if(7u < allowedthreads && limit8way <= count){// 8-way limit
 #endif
@@ -59710,8 +59636,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 					unsigned allowedthreadstemp{allowedthreads >> 1};
 					assert(1u < allowedthreadstemp);// each of the two parts will use at least two threads
+					indexsizeofpcall *= allowedthreadstemp;
 					std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
-					std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + allowedthreadstemp * indexsizeofpcall};
+					std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
+					asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 					try{
 						// process the upper half (rounded up) separately if possible
 						asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
@@ -59876,7 +59804,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				std::future<void> asyncreturnhandle;
 				{
-					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+					autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 					if(15u < allowedthreads && limit16way <= count){// 16-way limit
 						std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 						std::size_t const halfcount{count >> 1};// rounded down
@@ -59907,8 +59835,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 						unsigned allowedthreadstemp{allowedthreads >> 1};
 						assert(1u < allowedthreadstemp);// each of the two parts will use at least two threads
+						indexsizeofpcall *= allowedthreadstemp;
 						std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
-						std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + allowedthreadstemp * indexsizeofpcall};
+						std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
+						asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 						try{
 							// process the upper half (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
@@ -60077,7 +60007,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				std::future<void> asyncreturnhandle;
 				{
-					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+					autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 					if(15u < allowedthreads && limit16way <= count){// 16-way limit
 						std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 						std::size_t const halfcount{count >> 1};// rounded down
@@ -60108,8 +60038,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 						unsigned allowedthreadstemp{allowedthreads >> 1};
 						assert(1u < allowedthreadstemp);// each of the two parts will use at least two threads
+						indexsizeofpcall *= allowedthreadstemp;
 						std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
-						std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + allowedthreadstemp * indexsizeofpcall};
+						std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
+						asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 						try{
 							// process the upper half (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);

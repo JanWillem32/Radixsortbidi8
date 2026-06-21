@@ -64,6 +64,7 @@ See "Performance tests" for more details about array sizes, types and achievable
 - Reroutes to the 1- or 2-thread functions for single-part types
 - Reroutes to the 1- or 2-thread functions (variants without indirection)
 - Reroutes to the 1- or 2-thread functions (variants with indirection)
+- Helper class to safely moderate a std::future<std::future<void>> item on the stack
 - Helper functions for converting inputs to perform unsigned comparisons in a final merging phase
 - Helper functions for merging the halves from multithreading inputs without indirection
 - Up to 4-way multithreading functions without indirection
