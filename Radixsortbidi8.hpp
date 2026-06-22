@@ -11338,7 +11338,7 @@ struct autoaccumulateoffsetsarrays{
 			assert(paccumulator);
 			if constexpr(!isnoexcept){// first destroy the items under pfutures safely, this will block until all tasks are completed
 				unsigned i{num};
-				if(std::uncaught_exceptions()){// if we're already unwinding from an exception std::terminate would follow, so we just swallow any exceptions thrown by the destructors
+				if(std::uncaught_exceptions()){// if we're already unwinding from an exception std::terminate() would follow, so we just swallow any exceptions thrown by the destructors
 					try{
 						do RSBD8_LIKELY{
 nextprimary:
@@ -52262,15 +52262,24 @@ class autowrapfutureonfuture{
 
 public:
 	RSBD8_FUNC_INLINE ~autowrapfutureonfuture()noexcept(isnoexcept){
-		if(pfutureonfuture){// destroy it safely, this will block until all tasks are completed
+		if(pfutureonfuture){// destroy it safely, this will block until both tasks are completed
 			if constexpr(isnoexcept) pfutureonfuture->~future();
-			else if(std::uncaught_exceptions()){// if we're already unwinding from an exception std::terminate would follow, so we just swallow any exceptions thrown by the destructor
+			else if(std::uncaught_exceptions()){// if we're already unwinding from an exception std::terminate() would follow, so we just swallow any exceptions thrown by the destructors
 				try{
-					pfutureonfuture->~future();
+					pfutureonfuture->get();// discard the return value, however this will propagate any exception from the inner task
+				}catch(...){}// swallow any exception
+				try{
+					pfutureonfuture->~future();// this will not generate an exception-upon-exception inside a destructor from the inner task
+				}catch(...){}// swallow any exception
+			}else{// if we're not already unwinding from an exception, we can afford to throw an exception if the destructors fail, but we still need to make sure that all destructors are called, so we need to catch any exceptions thrown by the destructors and rethrow after all destructors have been called
+				try{
+					pfutureonfuture->get();// discard the return value, however this will propagate any exception from the inner task
 				}catch(...){
-					// swallow any exception
+					pfutureonfuture->~future();// this will not generate an exception-upon-exception inside a destructor from the inner task
+					throw;// rethrow the exception after cleaning up
 				}
-			}else pfutureonfuture->~future();
+				pfutureonfuture->~future();
+			}
 		}
 	}
 	// disable copy and move mechanisms
@@ -52284,7 +52293,7 @@ public:
 		// this class expects the incoming space to be uninitialised
 		pfutureonfuture = new(pempty) std::future<std::future<void>>;
 	}
-	RSBD8_FUNC_INLINE autowrapfutureonfuture &operator=(std::future<std::future<void>> *RSBD8_RESTRICT pobject)noexcept{
+	RSBD8_FUNC_INLINE autowrapfutureonfuture &operator=(std::future<std::future<void>> *RSBD8_RESTRICT &&pobject)noexcept{
 		assert(!pfutureonfuture);// do not re-use assignment with this class
 		// do not pass a nullptr here
 		assert(pobject);
