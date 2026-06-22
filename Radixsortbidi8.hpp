@@ -961,6 +961,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // the barrier atomic variable must be able to signal if an exception occurs
 struct atomicvarwrapper{
 	std::atomic_uintptr_t &main;
+
+	// disable copy and move mechanisms
+	atomicvarwrapper(atomicvarwrapper const &) = delete;
+	atomicvarwrapper &operator=(atomicvarwrapper const &) = delete;
 	RSBD8_FUNC_INLINE atomicvarwrapper(std::atomic_uintptr_t &init)noexcept : main{init}{}
 	RSBD8_FUNC_INLINE ~atomicvarwrapper()noexcept{
 		if(std::uncaught_exceptions()){// this destructor is purely to handle exceptions
@@ -972,8 +976,6 @@ struct atomicvarwrapper{
 			}// set it to the pointer value of itself to signal exception handling, any other value can be used for a valid state
 		}
 	}
-	atomicvarwrapper(atomicvarwrapper const &) = delete;
-	atomicvarwrapper &operator=(atomicvarwrapper const &) = delete;
 };
 
 // Utilities for general purpose register count compile-time detection
@@ -52261,6 +52263,25 @@ class autowrapfutureonfuture{
 	static_assert(sizeof(std::future<std::future<void>>) <= 2u * sizeof(std::future<void>), "unexpected size of std::future<std::future<void>>");
 
 public:
+	// disable copy and move mechanisms
+	autowrapfutureonfuture(autowrapfutureonfuture const &) = delete;
+	autowrapfutureonfuture &operator=(autowrapfutureonfuture const &) = delete;
+	RSBD8_FUNC_INLINE autowrapfutureonfuture()noexcept : pfutureonfuture{}{}
+	RSBD8_FUNC_INLINE autowrapfutureonfuture(void *RSBD8_RESTRICT pempty)noexcept{
+		// do not pass a nullptr here
+		assert(pempty);
+
+		// this class expects the incoming space to be uninitialised
+		pfutureonfuture = new(pempty) std::future<std::future<void>>;
+	}
+	RSBD8_FUNC_INLINE autowrapfutureonfuture &operator=(std::future<std::future<void>> *RSBD8_RESTRICT &&pobject)noexcept{
+		assert(!pfutureonfuture);// do not re-use assignment with this class
+		// do not pass a nullptr here
+		assert(pobject);
+
+		pfutureonfuture = pobject;
+		return{*this};
+	}
 	RSBD8_FUNC_INLINE ~autowrapfutureonfuture()noexcept(isnoexcept){
 		if(pfutureonfuture){// destroy it safely, this will block until both tasks are completed
 			if constexpr(isnoexcept) pfutureonfuture->~future();
@@ -52281,25 +52302,6 @@ public:
 				pfutureonfuture->~future();
 			}
 		}
-	}
-	// disable copy and move mechanisms
-	autowrapfutureonfuture(autowrapfutureonfuture const &) = delete;
-	autowrapfutureonfuture &operator=(autowrapfutureonfuture const &) = delete;
-	RSBD8_FUNC_INLINE autowrapfutureonfuture()noexcept : pfutureonfuture{}{}
-	RSBD8_FUNC_INLINE autowrapfutureonfuture(void *RSBD8_RESTRICT pempty)noexcept{
-		// do not pass a nullptr here
-		assert(pempty);
-
-		// this class expects the incoming space to be uninitialised
-		pfutureonfuture = new(pempty) std::future<std::future<void>>;
-	}
-	RSBD8_FUNC_INLINE autowrapfutureonfuture &operator=(std::future<std::future<void>> *RSBD8_RESTRICT &&pobject)noexcept{
-		assert(!pfutureonfuture);// do not re-use assignment with this class
-		// do not pass a nullptr here
-		assert(pobject);
-
-		pfutureonfuture = pobject;
-		return{*this};
 	}
 };
 
@@ -60618,12 +60620,7 @@ struct buffermemorywrapper{
 #if defined(_POSIX_C_SOURCE)
 	std::size_t size;
 #endif
-	RSBD8_FUNC_INLINE ~buffermemorywrapper()noexcept{
-		deallocatearray(ptr
-#if defined(_POSIX_C_SOURCE)
-			, size
-#endif
-			);}
+
 	// disable copy and move mechanisms
 	buffermemorywrapper(buffermemorywrapper const &) = delete;
 	buffermemorywrapper &operator=(buffermemorywrapper const &) = delete;
@@ -60631,11 +60628,18 @@ struct buffermemorywrapper{
 #if defined(_POSIX_C_SOURCE)
 		, std::size_t sizemem
 #endif
-		)noexcept : ptr(ptrmem)
+		)noexcept : ptr{ptrmem}
 #if defined(_POSIX_C_SOURCE)
-		, size(sizemem)
+		, size{sizemem}
 #endif
 		{}
+	RSBD8_FUNC_INLINE ~buffermemorywrapper()noexcept{
+		deallocatearray(ptr
+#if defined(_POSIX_C_SOURCE)
+			, size
+#endif
+			);
+	}
 };
 
 // Wrapper template functions for the main sorting functions in this library
