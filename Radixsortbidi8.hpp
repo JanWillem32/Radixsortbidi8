@@ -587,6 +587,7 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 #include <future>
 #include <atomic>
 #include <array>
+#include <exception>
 #include <memory>
 #include <new>
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
@@ -621,6 +622,10 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 // std::hardware_constructive_interference_size (C++17)
 #ifndef __cpp_lib_hardware_interference_size
 #error The compiler does not meet requirements for __cpp_lib_hardware_interference_size for this library.
+#endif
+// std::uncaught_exceptions (C++17)
+#ifndef __cpp_lib_uncaught_exceptions
+#error The compiler does not meet requirements for __cpp_lib_uncaught_exceptions for this library.
 #endif
 // std::is_nothrow_invocable_v (C++17)
 // std::invoke_result_t (C++17)
@@ -953,17 +958,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // this class is a simple RAII wrapper for the atomic variable when an exit state on destruction is needed
-// the barrier atomic variable must be able to signal exit, even if an exception occurs
+// the barrier atomic variable must be able to signal if an exception occurs
 struct atomicvarwrapper{
 	std::atomic_uintptr_t &main;
 	RSBD8_FUNC_INLINE atomicvarwrapper(std::atomic_uintptr_t &init)noexcept : main{init}{}
 	RSBD8_FUNC_INLINE ~atomicvarwrapper()noexcept{
-		std::uintptr_t old{};// this function assumes that the barrier atomic variable freed state is zero
-		while(!main.compare_exchange_weak(old, reinterpret_cast<std::uintptr_t>(&main))){
-			if(reinterpret_cast<std::uintptr_t>(&main) == old) break;// exit state by another thread
-			old = 0u;
-			spinpause();
-		}// set it to the pointer value of itself to signal exit, any other value is a busy state
+		if(std::uncaught_exceptions()){// this destructor is purely to handle exceptions
+			std::uintptr_t old{};// this function assumes that the barrier atomic variable freed state is zero
+				while(!main.compare_exchange_weak(old, reinterpret_cast<std::uintptr_t>(&main))){
+				if(reinterpret_cast<std::uintptr_t>(&main) == old) break;// same state by another thread
+				old = 0u;
+				spinpause();
+			}// set it to the pointer value of itself to signal exception handling, any other value can be used for a valid state
+		}
 	}
 	atomicvarwrapper(atomicvarwrapper const &) = delete;
 	atomicvarwrapper &operator=(atomicvarwrapper const &) = delete;
@@ -11317,202 +11324,272 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // Utilities to produce the accumulated index counts from multple arrays
 
 // this class is a simple RAII wrapper for the buffer memory allocated with allocatearray()
-template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X, bool isnoexcept = true>
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X, bool isnoexcept>
 struct autoaccumulateoffsetsarrays{
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> const *RSBD8_RESTRICT paddends;
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT paccumulator;
 	std::future<void> *RSBD8_RESTRICT pfutures;// this class expects these to be constructed by placement new
 	unsigned num;
 
-	// use with caution, as the only function of this struct is the destructor
+	// use with caution, as the only function of this class is the destructor
 	RSBD8_FUNC_NORMAL ~autoaccumulateoffsetsarrays()noexcept(isnoexcept){
-		// do not pass a nullptr here
-		assert(paddends);
+		if(num){
+			assert(paddends);
+			assert(paccumulator);
+			if constexpr(!isnoexcept){// first destroy the items under pfutures safely, this will block until all tasks are completed
+				unsigned i{num};
+				if(std::uncaught_exceptions()){// if we're already unwinding from an exception std::terminate would follow, so we just swallow any exceptions thrown by the destructors
+					try{
+						do RSBD8_LIKELY{
+nextprimary:
+							++pfutures;
+							pfutures[-1].~future();
+						}while(--i);
+					}catch(...){// swallow any exception
+						goto nextprimary;
+					}
+				}else{// if we're not already unwinding from an exception, we can afford to throw an exception if the destructors fail, but we still need to make sure that all destructors are called, so we need to catch any exceptions thrown by the destructors and rethrow after all destructors have been called
+					try{
+							do RSBD8_LIKELY{
+							++pfutures;
+							pfutures[-1].~future();
+						}while(--i);
+					}catch(...){// if an exception is thrown, we still need to destroy the items under pfutures safely, this will block until all tasks are completed
+						try{
+							do RSBD8_LIKELY{
+nextsecondary:
+								++pfutures;
+								pfutures[-1].~future();
+							}while(--i);
+						}catch(...){// swallow any secondary exception
+							goto nextsecondary;
+						}
+						throw;// rethrow the exception after cleaning up
+					}
+				}
+			}
 
-		std::destroy_n(pfutures, num);// destroy the pfutures safely, this will block until all tasks are completed
-		// all loops here will usually inline and auto-vectorise items
-		// if more fine-tuning is required, manually vectorising this part shoud be easy for target architectures
-		if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to one at a time when there's very few registers
-			while(num)RSBD8_LIKELY{
-				auto const *RSBD8_RESTRICT p0{paddends[0].data()};
-				for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
-					auto aa{elem};
-					aa += *p0++;
-					elem = aa;
+			// all loops here will usually inline and auto-vectorise items
+			// if more fine-tuning is required, manually vectorising this part shoud be easy for target architectures
+			if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to one at a time when there's very few registers
+				while(num)RSBD8_LIKELY{
+					if constexpr(isnoexcept) pfutures[0].~future();
+					auto const *RSBD8_RESTRICT p0{paddends[0].data()};
+					for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
+						auto aa{elem};
+						aa += *p0++;
+						elem = aa;
+					}
+					if constexpr(isnoexcept) ++pfutures;
+					++paddends;
+					--num;
 				}
-				++pfutures;
-				++paddends;
-				--num;
-			}
-		}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to few at a time when there's few registers
-			while(3u <= num)RSBD8_UNLIKELY{
-				auto const *RSBD8_RESTRICT p0{paddends[0].data()};
-				auto const *RSBD8_RESTRICT p1{paddends[1].data()};
-				auto const *RSBD8_RESTRICT p2{paddends[2].data()};
-				for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
-					auto aa{elem};
-					auto a0{*p0++};
-					aa += *p1++;
-					a0 += *p2++;
-					aa += a0;
-					elem = aa;
-				}
-				num -= 3u;
-				pfutures += 3;
-				paddends += 3;
-			}
-			switch(num){
-			case 2u:
-				{
+			}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to few at a time when there's few registers
+				while(3u <= num)RSBD8_UNLIKELY{
+					if constexpr(isnoexcept){
+						pfutures[0].~future();
+						pfutures[1].~future();
+						pfutures[2].~future();
+					}
 					auto const *RSBD8_RESTRICT p0{paddends[0].data()};
 					auto const *RSBD8_RESTRICT p1{paddends[1].data()};
+					auto const *RSBD8_RESTRICT p2{paddends[2].data()};
 					for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
 						auto aa{elem};
-						aa += *p0++;
+						auto a0{*p0++};
 						aa += *p1++;
+						a0 += *p2++;
+						aa += a0;
 						elem = aa;
 					}
+					num -= 3u;
+					if constexpr(isnoexcept) pfutures += 3;
+					paddends += 3;
 				}
-				break;
-			case 1u:
-				{
-					auto const *RSBD8_RESTRICT p0{paddends[0].data()};
-					for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
-						auto aa{elem};
-						aa += *p0++;
-						elem = aa;
+				if constexpr(isnoexcept) pfutures[0].~future();// the first item is guaranteed here
+				switch(num){
+				case 2u:
+					{
+						if constexpr(isnoexcept) pfutures[1].~future();
+						auto const *RSBD8_RESTRICT p0{paddends[0].data()};
+						auto const *RSBD8_RESTRICT p1{paddends[1].data()};
+						for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
+							auto aa{elem};
+							aa += *p0++;
+							aa += *p1++;
+							elem = aa;
+						}
+					}
+					break;
+				default:
+					assert(1u == num);
+					{
+						auto const *RSBD8_RESTRICT p0{paddends[0].data()};
+						for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
+							auto aa{elem};
+							aa += *p0++;
+							elem = aa;
+						}
 					}
 				}
-				break;
-			default:
-				assert(!num);
-			}
-		}else{// architecture: do not limit as much when there's a reasonable amount of registers
-			while(7u <= num)RSBD8_UNLIKELY{
-				auto const *RSBD8_RESTRICT p0{paddends[0].data()};
-				auto const *RSBD8_RESTRICT p1{paddends[1].data()};
-				auto const *RSBD8_RESTRICT p2{paddends[2].data()};
-				auto const *RSBD8_RESTRICT p3{paddends[3].data()};
-				auto const *RSBD8_RESTRICT p4{paddends[4].data()};
-				auto const *RSBD8_RESTRICT p5{paddends[5].data()};
-				auto const *RSBD8_RESTRICT p6{paddends[6].data()};
-				for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
-					auto aa{elem};
-					auto a0{*p0++};
-					auto a1{*p1++};
-					auto a2{*p2++};
-					aa += *p3++;
-					a0 += *p4++;
-					a1 += *p5++;
-					a2 += *p6++;
-					aa += a0;
-					a1 += a2;
-					aa += a1;
-					elem = aa;
-				}
-				num -= 7u;
-				pfutures += 7;
-				paddends += 7;
-			}
-			switch(num){
-			case 6u:
-				{
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				while(7u <= num)RSBD8_UNLIKELY{
+					if constexpr(isnoexcept){
+						pfutures[0].~future();
+						pfutures[1].~future();
+						pfutures[2].~future();
+						pfutures[3].~future();
+						pfutures[4].~future();
+						pfutures[5].~future();
+						pfutures[6].~future();
+					}
 					auto const *RSBD8_RESTRICT p0{paddends[0].data()};
 					auto const *RSBD8_RESTRICT p1{paddends[1].data()};
 					auto const *RSBD8_RESTRICT p2{paddends[2].data()};
 					auto const *RSBD8_RESTRICT p3{paddends[3].data()};
 					auto const *RSBD8_RESTRICT p4{paddends[4].data()};
 					auto const *RSBD8_RESTRICT p5{paddends[5].data()};
+					auto const *RSBD8_RESTRICT p6{paddends[6].data()};
 					for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
 						auto aa{elem};
 						auto a0{*p0++};
 						auto a1{*p1++};
-						aa += *p2++;
-						a0 += *p3++;
-						a1 += *p4++;
-						aa += *p5++;
-						a0 += a1;
+						auto a2{*p2++};
+						aa += *p3++;
+						a0 += *p4++;
+						a1 += *p5++;
+						a2 += *p6++;
 						aa += a0;
-						elem = aa;
-					}
-				}
-				break;
-			case 5u:
-				{
-					auto const *RSBD8_RESTRICT p0{paddends[0].data()};
-					auto const *RSBD8_RESTRICT p1{paddends[1].data()};
-					auto const *RSBD8_RESTRICT p2{paddends[2].data()};
-					auto const *RSBD8_RESTRICT p3{paddends[3].data()};
-					auto const *RSBD8_RESTRICT p4{paddends[4].data()};
-					for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
-						auto aa{elem};
-						auto a0{*p0++};
-						auto a1{*p1++};
-						aa += *p2++;
-						a0 += *p3++;
-						a1 += *p4++;
-						aa += a0;
+						a1 += a2;
 						aa += a1;
 						elem = aa;
 					}
+					num -= 7u;
+					if constexpr(isnoexcept) pfutures += 7;
+					paddends += 7;
 				}
-				break;
-			case 4u:
-				{
-					auto const *RSBD8_RESTRICT p0{paddends[0].data()};
-					auto const *RSBD8_RESTRICT p1{paddends[1].data()};
-					auto const *RSBD8_RESTRICT p2{paddends[2].data()};
-					auto const *RSBD8_RESTRICT p3{paddends[3].data()};
-					for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
-						auto aa{elem};
-						auto a0{*p0++};
-						aa += *p1++;
-						a0 += *p2++;
-						aa += *p3++;
-						aa += a0;
-						elem = aa;
+				if constexpr(isnoexcept) pfutures[0].~future();// the first item is guaranteed here
+				switch(num){
+				case 6u:
+					{
+						if constexpr(isnoexcept){
+							pfutures[1].~future();
+							pfutures[2].~future();
+							pfutures[3].~future();
+							pfutures[4].~future();
+							pfutures[5].~future();
+						}
+						auto const *RSBD8_RESTRICT p0{paddends[0].data()};
+						auto const *RSBD8_RESTRICT p1{paddends[1].data()};
+						auto const *RSBD8_RESTRICT p2{paddends[2].data()};
+						auto const *RSBD8_RESTRICT p3{paddends[3].data()};
+						auto const *RSBD8_RESTRICT p4{paddends[4].data()};
+						auto const *RSBD8_RESTRICT p5{paddends[5].data()};
+						for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
+							auto aa{elem};
+							auto a0{*p0++};
+							auto a1{*p1++};
+							aa += *p2++;
+							a0 += *p3++;
+							a1 += *p4++;
+							aa += *p5++;
+							a0 += a1;
+							aa += a0;
+							elem = aa;
+						}
+					}
+					break;
+				case 5u:
+					{
+						if constexpr(isnoexcept){
+							pfutures[1].~future();
+							pfutures[2].~future();
+							pfutures[3].~future();
+							pfutures[4].~future();
+						}
+						auto const *RSBD8_RESTRICT p0{paddends[0].data()};
+						auto const *RSBD8_RESTRICT p1{paddends[1].data()};
+						auto const *RSBD8_RESTRICT p2{paddends[2].data()};
+						auto const *RSBD8_RESTRICT p3{paddends[3].data()};
+						auto const *RSBD8_RESTRICT p4{paddends[4].data()};
+						for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
+							auto aa{elem};
+							auto a0{*p0++};
+							auto a1{*p1++};
+							aa += *p2++;
+							a0 += *p3++;
+							a1 += *p4++;
+							aa += a0;
+							aa += a1;
+							elem = aa;
+						}
+					}
+					break;
+				case 4u:
+					{
+						if constexpr(isnoexcept){
+							pfutures[1].~future();
+							pfutures[2].~future();
+							pfutures[3].~future();
+						}
+						auto const *RSBD8_RESTRICT p0{paddends[0].data()};
+						auto const *RSBD8_RESTRICT p1{paddends[1].data()};
+						auto const *RSBD8_RESTRICT p2{paddends[2].data()};
+						auto const *RSBD8_RESTRICT p3{paddends[3].data()};
+						for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
+							auto aa{elem};
+							auto a0{*p0++};
+							aa += *p1++;
+							a0 += *p2++;
+							aa += *p3++;
+							aa += a0;
+							elem = aa;
+						}
+					}
+					break;
+				case 3u:
+					{
+						if constexpr(isnoexcept){
+							pfutures[1].~future();
+							pfutures[2].~future();
+						}
+						auto const *RSBD8_RESTRICT p0{paddends[0].data()};
+						auto const *RSBD8_RESTRICT p1{paddends[1].data()};
+						auto const *RSBD8_RESTRICT p2{paddends[2].data()};
+						for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
+							auto aa{elem};
+							auto a0{*p0++};
+							aa += *p1++;
+							a0 += *p2++;
+							aa += a0;
+							elem = aa;
+						}
+					}
+					break;
+				case 2u:
+					{
+						if constexpr(isnoexcept) pfutures[1].~future();
+						auto const *RSBD8_RESTRICT p0{paddends[0].data()};
+						auto const *RSBD8_RESTRICT p1{paddends[1].data()};
+						for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
+							auto aa{elem};
+							aa += *p0++;
+							aa += *p1++;
+							elem = aa;
+						}
+					}
+					break;
+				default:
+					assert(1u == num);
+					{
+						auto const *RSBD8_RESTRICT p0{paddends[0].data()};
+						for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
+							auto aa{elem};
+							aa += *p0++;
+							elem = aa;
+						}
 					}
 				}
-				break;
-			case 3u:
-				{
-					auto const *RSBD8_RESTRICT p0{paddends[0].data()};
-					auto const *RSBD8_RESTRICT p1{paddends[1].data()};
-					auto const *RSBD8_RESTRICT p2{paddends[2].data()};
-					for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
-						auto aa{elem};
-						auto a0{*p0++};
-						aa += *p1++;
-						a0 += *p2++;
-						aa += a0;
-						elem = aa;
-					}
-				}
-				break;
-			case 2u:
-				{
-					auto const *RSBD8_RESTRICT p0{paddends[0].data()};
-					auto const *RSBD8_RESTRICT p1{paddends[1].data()};
-					for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
-						auto aa{elem};
-						aa += *p0++;
-						aa += *p1++;
-						elem = aa;
-					}
-				}
-				break;
-			case 1u:
-				{
-					auto const *RSBD8_RESTRICT p0{paddends[0].data()};
-					for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
-						auto aa{elem};
-						aa += *p0++;
-						elem = aa;
-					}
-				}
-				break;
-			default:
-				assert(!num);
 			}
 		}
 	}
@@ -14463,7 +14540,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		if constexpr(isrevorder) radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(count, allowedthreads, 1u, std::ref(*pindices), input, output, buffer);
 		else radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, output);
 	}
@@ -14599,7 +14676,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -15011,7 +15088,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer);
 	}
 
@@ -15142,7 +15219,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -17352,7 +17429,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		if constexpr(isrevorder) radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, output, buffer, varparameters...);
 		else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, output, varparameters...);
 	}
@@ -17506,7 +17583,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -18057,7 +18134,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return// the companion thread produced an exception
+#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+					asynchandle// let a possible parent thread wait on all of its childen
+#endif
+					;
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -18129,7 +18210,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer, varparameters...);
 	}
 
@@ -18278,7 +18359,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -18926,7 +19007,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return// the companion thread produced an exception
+#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+					asynchandle// let a possible parent thread wait on all of its childen
+#endif
+					;
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -19768,7 +19853,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		if constexpr(isrevorder) radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(count, allowedthreads, 1u, std::ref(*pindices), input, output, buffer);
 		else radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, output);
 	}
@@ -19908,7 +19993,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -20283,7 +20368,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer);
 	}
 
@@ -20418,7 +20503,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -21907,7 +21992,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		if constexpr(isrevorder) radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, output, buffer, varparameters...);
 		else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, output, varparameters...);
 	}
@@ -22059,7 +22144,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -22553,7 +22638,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return// the companion thread produced an exception
+#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+					asynchandle// let a possible parent thread wait on all of its childen
+#endif
+					;
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -22621,7 +22710,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer, varparameters...);
 	}
 
@@ -22768,7 +22857,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -23264,7 +23353,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return// the companion thread produced an exception
+#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+					asynchandle// let a possible parent thread wait on all of its childen
+#endif
+					;
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -24384,7 +24477,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		if constexpr(isrevorder) radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(count, allowedthreads, 1u, std::ref(*pindices), input, output, buffer);
 		else radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, output);
 	}
@@ -24524,7 +24617,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -24925,7 +25018,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer);
 	}
 
@@ -25060,7 +25153,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -27084,7 +27177,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		if constexpr(isrevorder) radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, output, buffer, varparameters...);
 		else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, output, varparameters...);
 	}
@@ -27234,7 +27327,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -27832,7 +27925,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return// the companion thread produced an exception
+#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+					asynchandle// let a possible parent thread wait on all of its childen
+#endif
+					;
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -27903,7 +28000,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer, varparameters...);
 	}
 
@@ -28050,7 +28147,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -28756,7 +28853,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return// the companion thread produced an exception
+#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+					asynchandle// let a possible parent thread wait on all of its childen
+#endif
+					;
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -31899,7 +32000,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		if constexpr(isrevorder) radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(count, allowedthreads, 1u, std::ref(*pindices), input, output, buffer);
 		else radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, output);
 	}
@@ -32035,7 +32136,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -33955,7 +34056,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer);
 	}
 
@@ -34086,7 +34187,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -40264,7 +40365,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		if constexpr(isrevorder) radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, output, buffer, varparameters...);
 		else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, output, varparameters...);
 	}
@@ -40409,7 +40510,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -43798,7 +43899,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return// the companion thread produced an exception
+#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+					asynchandle// let a possible parent thread wait on all of its childen
+#endif
+					;
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -43870,7 +43975,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer, varparameters...);
 	}
 
@@ -44010,7 +44115,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -48121,7 +48226,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the companion thread produced an exception
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return// the companion thread produced an exception
+#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+					asynchandle// let a possible parent thread wait on all of its childen
+#endif
+					;
 			}
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -48869,7 +48978,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, output);
 	}
 
@@ -48925,7 +49034,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input);
 	}
 
@@ -49019,7 +49128,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -49298,7 +49407,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -49442,7 +49551,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer);
 	}
 
@@ -49496,7 +49605,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input);
 	}
 
@@ -49592,7 +49701,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -49871,7 +49980,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -50498,7 +50607,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, allowedthreads, 1u, std::ref(*pindices), input, output, varparameters...);
 	}
 
@@ -50618,7 +50727,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -50957,7 +51066,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
 		radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer, varparameters...);
 	}
 
@@ -51079,7 +51188,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the first item is used by this thread
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> &RSBD8_RESTRICT offsets{*reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> *>(pzeroedindices)};
 		{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
-			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>, std::nullptr_t> collect;
+			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable, autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>>, std::nullptr_t> collect;
 			if constexpr(ismultithreadcapable){
 				// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 				collect.paddends = reinterpret_cast<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *>(pzeroedindices) + 2;
@@ -52145,12 +52254,24 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // Helper class to safely moderate a std::future<std::future<void>> item on the stack
 
 // this class is a simple RAII wrapper to specifically use some space in a pre-allocated array instead of on the stack
+template<bool isnoexcept>
 class autowrapfutureonfuture{
 	std::future<std::future<void>> *RSBD8_RESTRICT pfutureonfuture;// this class expects the incoming space to be uninitialised
+	// to reinforce the special use case of this class:
+	static_assert(sizeof(std::future<std::future<void>>) <= 2u * sizeof(std::future<void>), "unexpected size of std::future<std::future<void>>");
 
 public:
-	RSBD8_FUNC_INLINE ~autowrapfutureonfuture()noexcept{
-		if(pfutureonfuture) pfutureonfuture->~future();// destroy it safely, this will block until all tasks are completed
+	RSBD8_FUNC_INLINE ~autowrapfutureonfuture()noexcept(isnoexcept){
+		if(pfutureonfuture){// destroy it safely, this will block until all tasks are completed
+			if constexpr(isnoexcept) pfutureonfuture->~future();
+			else if(std::uncaught_exceptions()){// if we're already unwinding from an exception std::terminate would follow, so we just swallow any exceptions thrown by the destructor
+				try{
+					pfutureonfuture->~future();
+				}catch(...){
+					// swallow any exception
+				}
+			}else pfutureonfuture->~future();
+		}
 	}
 	// disable copy and move mechanisms
 	autowrapfutureonfuture(autowrapfutureonfuture const &) = delete;
@@ -52161,22 +52282,14 @@ public:
 		assert(pempty);
 
 		// this class expects the incoming space to be uninitialised
-		static_assert(sizeof(std::future<std::future<void>>) <= 2u * sizeof(std::future<void>), "unexpected size of std::future<std::future<void>>");
 		pfutureonfuture = new(pempty) std::future<std::future<void>>;
 	}
-	RSBD8_FUNC_INLINE void assignspace(void *RSBD8_RESTRICT pempty)noexcept{
-		assert(!pfutureonfuture);
+	RSBD8_FUNC_INLINE autowrapfutureonfuture &operator=(std::future<std::future<void>> *RSBD8_RESTRICT pobject)noexcept{
+		assert(!pfutureonfuture);// do not re-use assignment with this class
 		// do not pass a nullptr here
-		assert(pempty);
+		assert(pobject);
 
-		// this class expects the incoming space to be uninitialised
-		static_assert(sizeof(std::future<std::future<void>>) <= 2u * sizeof(std::future<void>), "unexpected size of std::future<std::future<void>>");
-		pfutureonfuture = new(pempty) std::future<std::future<void>>;
-	}
-	RSBD8_FUNC_INLINE autowrapfutureonfuture &operator=(std::future<std::future<void>> &&object)noexcept{
-		assert(pfutureonfuture);// use the non-trivial initialiser or assignspace() before assignment
-
-		*pfutureonfuture = std::move(object);
+		pfutureonfuture = pobject;
 		return{*this};
 	}
 };
@@ -54974,7 +55087,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 		std::future<void> asyncreturnhandle;
 		{
-			autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+			autowrapfutureonfuture<true> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			if(3u < allowedthreads && limit4way <= count){// 4-way limit
 #endif
@@ -55010,10 +55123,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				indexsizeofpcall *= allowedthreadstemp;
 				std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
 				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
-				asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 				try{
 					// process the upper half (rounded up) separately if possible
-					asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount);
+					asynchandle = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount)};// use the otherwise unused space
 					pcall = pcallsmaller;
 					allowedthreads = allowedthreadstemp;
 					std::swap(output, buffer);// swap the buffer pointers for the lower half processing
@@ -55144,7 +55256,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 		std::future<void> asyncreturnhandle;
 		{
-			autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+			autowrapfutureonfuture<true> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			if(3u < allowedthreads && limit4way <= count){// 4-way limit
 #endif
@@ -55180,10 +55292,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				indexsizeofpcall *= allowedthreadstemp;
 				std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
 				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
-				asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 				try{
 					// process the upper half (rounded up) separately if possible
-					asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer);
+					asynchandle = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer)};// use the otherwise unused space
 					pcall = pcallsmaller;
 					allowedthreads = allowedthreadstemp;
 					movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
@@ -56368,7 +56479,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
 		std::future<void> asyncreturnhandle;
 		{
-			autowrapfutureonfuture asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
+			autowrapfutureonfuture<true> asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
 			static std::size_t constexpr limit6way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 				base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -56411,20 +56522,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				indexsizeofpcall *= allowedthreadstemp;
 				std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
 				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
-				asynchandlemid.assignspace(pfuturesiter - 2);// use the otherwise unused space
 				try{
 					// process the middle third (rounded in between) separately if possible
-					asynchandlemid = std::async(std::launch::async, pcallsmaller, thirdcountmid, allowedthreadstemp, pfuturesiter, pindicesiter, input + thirdcount, buffer + thirdcount, output + thirdcount);
+					asynchandlemid = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, thirdcountmid, allowedthreadstemp, pfuturesiter, pindicesiter, input + thirdcount, buffer + thirdcount, output + thirdcount)};// use the otherwise unused space
 					pcall = pcallsmaller;
 					allowedthreads = allowedthreadstemp;
 					pfuturesiter += allowedthreadstemp;// 2 unused slots per split
 					pindicesiter += indexsizeofpcall;
-					asynchandletop.assignspace(pfuturesiter - 2);// use the otherwise unused space
 					std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 					finalcount = thirdcount;
 					try{
 						// process the top third (rounded up) separately if possible
-						asynchandletop = std::async(std::launch::async, pcallsmaller, thirdcounttop, allowedthreads, pfuturesiter, pindicesiter, input + twothirdscount, output + twothirdscount, buffer + twothirdscount);
+						asynchandletop = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, thirdcounttop, allowedthreads, pfuturesiter, pindicesiter, input + twothirdscount, output + twothirdscount, buffer + twothirdscount)};// use the otherwise unused space
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 						// given the absolute rarity of this case, simply process this part in the current thread
@@ -56529,7 +56638,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
 		std::future<void> asyncreturnhandle;
 		{
-			autowrapfutureonfuture asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
+			autowrapfutureonfuture<true> asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
 			static std::size_t constexpr limit6way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 				base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -56572,20 +56681,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				indexsizeofpcall *= allowedthreadstemp;
 				std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
 				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
-				asynchandlemid.assignspace(pfuturesiter - 2);// use the otherwise unused space
 				try{
 					// process the middle third (rounded in between) separately if possible
-					asynchandlemid = std::async(std::launch::async, pcallsmaller, thirdcountmid, allowedthreadstemp, pfuturesiter, pindicesiter, input + thirdcount, buffer + thirdcount, !movetobuffer);
+					asynchandlemid = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, thirdcountmid, allowedthreadstemp, pfuturesiter, pindicesiter, input + thirdcount, buffer + thirdcount, !movetobuffer)};// use the otherwise unused space
 					pcall = pcallsmaller;
 					allowedthreads = allowedthreadstemp;
 					pfuturesiter += allowedthreadstemp;// 2 unused slots per split
 					pindicesiter += indexsizeofpcall;
-					asynchandletop.assignspace(pfuturesiter - 2);// use the otherwise unused space
 					movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 					finalcount = thirdcount;
 					try{
 						// process the top third (rounded up) separately if possible
-						asynchandletop = std::async(std::launch::async, pcallsmaller, thirdcounttop, allowedthreads, pfuturesiter, pindicesiter, input + twothirdscount, buffer + twothirdscount, movetobuffer);
+						asynchandletop = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, thirdcounttop, allowedthreads, pfuturesiter, pindicesiter, input + twothirdscount, buffer + twothirdscount, movetobuffer)};// use the otherwise unused space
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 						// given the absolute rarity of this case, simply process this part in the current thread
@@ -56731,7 +56838,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			std::future<void> asyncreturnhandle;
 			{
-				autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+				autowrapfutureonfuture<true> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				if(7u < allowedthreads && limit8way <= count){// 8-way limit
 #endif
@@ -56767,10 +56874,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					indexsizeofpcall *= allowedthreadstemp;
 					std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
 					std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
-					asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 					try{
 						// process the upper half (rounded up) separately if possible
-						asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount);
+						asynchandle = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount)};// use the otherwise unused space
 						pcall = pcallsmaller;
 						allowedthreads = allowedthreadstemp;
 						std::swap(output, buffer);// swap the buffer pointers for the lower half processing
@@ -56929,7 +57035,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				std::future<void> asyncreturnhandle;
 				{
-					autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+					autowrapfutureonfuture<true> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 					if(7u < allowedthreads && limit8way <= count){// 8-way limit
 #endif
@@ -56965,10 +57071,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						indexsizeofpcall *= allowedthreadstemp;
 						std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
 						std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
-						asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 						try{
 							// process the upper half (rounded up) separately if possible
-							asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer);
+							asynchandle = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer)};// use the otherwise unused space
 							pcall = pcallsmaller;
 							allowedthreads = allowedthreadstemp;
 							movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
@@ -57128,7 +57233,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				std::future<void> asyncreturnhandle;
 				{
-					autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+					autowrapfutureonfuture<true> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 					if(15u < allowedthreads && limit16way <= count){// 16-way limit
 						std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 						std::size_t const halfcount{count >> 1};// rounded down
@@ -57162,10 +57267,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						indexsizeofpcall *= allowedthreadstemp;
 						std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
 						std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
-						asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 						try{
 							// process the upper half (rounded up) separately if possible
-							asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount);
+							asynchandle = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount)};// use the otherwise unused space
 							pcall = pcallsmaller;
 							allowedthreads = allowedthreadstemp;
 							std::swap(output, buffer);// swap the buffer pointers for the lower half processing
@@ -57326,7 +57430,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				std::future<void> asyncreturnhandle;
 				{
-					autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+					autowrapfutureonfuture<true> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 					if(15u < allowedthreads && limit16way <= count){// 16-way limit
 						std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 						std::size_t const halfcount{count >> 1};// rounded down
@@ -57360,10 +57464,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						indexsizeofpcall *= allowedthreadstemp;
 						std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
 						std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
-						asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 						try{
 							// process the upper half (rounded up) separately if possible
-							asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer);
+							asynchandle = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer)};// use the otherwise unused space
 							pcall = pcallsmaller;
 							allowedthreads = allowedthreadstemp;
 							movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
@@ -57947,7 +58050,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 		std::future<void> asyncreturnhandle;
 		{
-			autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+			autowrapfutureonfuture<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			if(3u < allowedthreads && limit4way <= count){// 4-way limit
 #endif
@@ -57983,10 +58086,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				indexsizeofpcall *= allowedthreadstemp;
 				std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
 				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
-				asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 				try{
 					// process the upper half (rounded up) separately if possible
-					asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
+					asynchandle = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount, varparameters...)};// use the otherwise unused space
 					pcall = pcallsmaller;
 					allowedthreads = allowedthreadstemp;
 					std::swap(output, buffer);// swap the buffer pointers for the lower half processing
@@ -58109,7 +58211,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 		std::future<void> asyncreturnhandle;
 		{
-			autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+			autowrapfutureonfuture<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			if(3u < allowedthreads && limit4way <= count){// 4-way limit
 #endif
@@ -58145,10 +58247,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				indexsizeofpcall *= allowedthreadstemp;
 				std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
 				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
-				asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 				try{
 					// process the upper half (rounded up) separately if possible
-					asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
+					asynchandle = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...)};// use the otherwise unused space
 					pcall = pcallsmaller;
 					allowedthreads = allowedthreadstemp;
 					movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
@@ -59057,7 +59158,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
 		std::future<void> asyncreturnhandle;
 		{
-			autowrapfutureonfuture asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
+			autowrapfutureonfuture<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
 			static std::size_t constexpr limit6way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 				base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -59100,20 +59201,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				indexsizeofpcall *= allowedthreadstemp;
 				std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
 				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
-				asynchandlemid.assignspace(pfuturesiter - 2);// use the otherwise unused space
 				try{
 					// process the middle third (rounded in between) separately if possible
-					asynchandlemid = std::async(std::launch::async, pcallsmaller, thirdcountmid, allowedthreadstemp, pfuturesiter, pindicesiter, input + thirdcount, buffer + thirdcount, output + thirdcount, varparameters...);
+					asynchandlemid = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, thirdcountmid, allowedthreadstemp, pfuturesiter, pindicesiter, input + thirdcount, buffer + thirdcount, output + thirdcount, varparameters...)};// use the otherwise unused space
 					pcall = pcallsmaller;
 					allowedthreads = allowedthreadstemp;
 					pfuturesiter += allowedthreadstemp;// 2 unused slots per split
 					pindicesiter += indexsizeofpcall;
-					asynchandletop.assignspace(pfuturesiter - 2);// use the otherwise unused space
 					std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 					finalcount = thirdcount;
 					try{
 						// process the top third (rounded up) separately if possible
-						asynchandletop = std::async(std::launch::async, pcallsmaller, thirdcounttop, allowedthreads, pfuturesiter, pindicesiter, input + twothirdscount, output + twothirdscount, buffer + twothirdscount, varparameters...);
+						asynchandletop = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, thirdcounttop, allowedthreads, pfuturesiter, pindicesiter, input + twothirdscount, output + twothirdscount, buffer + twothirdscount, varparameters...)};// use the otherwise unused space
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 						// given the absolute rarity of this case, simply process this part in the current thread
@@ -59217,7 +59316,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
 		std::future<void> asyncreturnhandle;
 		{
-			autowrapfutureonfuture asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
+			autowrapfutureonfuture<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
 			static std::size_t constexpr limit6way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 				base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -59260,20 +59359,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				indexsizeofpcall *= allowedthreadstemp;
 				std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
 				std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
-				asynchandlemid.assignspace(pfuturesiter - 2);// use the otherwise unused space
 				try{
 					// process the middle third (rounded in between) separately if possible
-					asynchandlemid = std::async(std::launch::async, pcallsmaller, thirdcountmid, allowedthreadstemp, pfuturesiter, pindicesiter, input + thirdcount, buffer + thirdcount, !movetobuffer, varparameters...);
+					asynchandlemid = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, thirdcountmid, allowedthreadstemp, pfuturesiter, pindicesiter, input + thirdcount, buffer + thirdcount, !movetobuffer, varparameters...)};// use the otherwise unused space
 					pcall = pcallsmaller;
 					allowedthreads = allowedthreadstemp;
 					pfuturesiter += allowedthreadstemp;// 2 unused slots per split
 					pindicesiter += indexsizeofpcall;
-					asynchandletop.assignspace(pfuturesiter - 2);// use the otherwise unused space
 					movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 					finalcount = thirdcount;
 					try{
 						// process the top third (rounded up) separately if possible
-						asynchandletop = std::async(std::launch::async, pcallsmaller, thirdcounttop, allowedthreads, pfuturesiter, pindicesiter, input + twothirdscount, buffer + twothirdscount, movetobuffer, varparameters...);
+						asynchandletop = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, thirdcounttop, allowedthreads, pfuturesiter, pindicesiter, input + twothirdscount, buffer + twothirdscount, movetobuffer, varparameters...)};// use the otherwise unused space
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 						// given the absolute rarity of this case, simply process this part in the current thread
@@ -59413,7 +59510,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			std::future<void> asyncreturnhandle;
 			{
-				autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+				autowrapfutureonfuture<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				if(7u < allowedthreads && limit8way <= count){// 8-way limit
 #endif
@@ -59449,10 +59546,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					indexsizeofpcall *= allowedthreadstemp;
 					std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
 					std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
-					asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 					try{
 						// process the upper half (rounded up) separately if possible
-						asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
+						asynchandle = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount, varparameters...)};// use the otherwise unused space
 						pcall = pcallsmaller;
 						allowedthreads = allowedthreadstemp;
 						std::swap(output, buffer);// swap the buffer pointers for the lower half processing
@@ -59603,7 +59699,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			std::future<void> asyncreturnhandle;
 			{
-				autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+				autowrapfutureonfuture<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				if(7u < allowedthreads && limit8way <= count){// 8-way limit
 #endif
@@ -59639,10 +59735,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					indexsizeofpcall *= allowedthreadstemp;
 					std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
 					std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
-					asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 					try{
 						// process the upper half (rounded up) separately if possible
-						asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
+						asynchandle = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...)};// use the otherwise unused space
 						pcall = pcallsmaller;
 						allowedthreads = allowedthreadstemp;
 						movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
@@ -59804,7 +59899,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				std::future<void> asyncreturnhandle;
 				{
-					autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+					autowrapfutureonfuture<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 					if(15u < allowedthreads && limit16way <= count){// 16-way limit
 						std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 						std::size_t const halfcount{count >> 1};// rounded down
@@ -59838,10 +59933,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						indexsizeofpcall *= allowedthreadstemp;
 						std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
 						std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
-						asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 						try{
 							// process the upper half (rounded up) separately if possible
-							asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
+							asynchandle = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, output + halfcount, varparameters...)};// use the otherwise unused space
 							pcall = pcallsmaller;
 							allowedthreads = allowedthreadstemp;
 							std::swap(output, buffer);// swap the buffer pointers for the lower half processing
@@ -60007,7 +60101,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				std::future<void> asyncreturnhandle;
 				{
-					autowrapfutureonfuture asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+					autowrapfutureonfuture<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 					if(15u < allowedthreads && limit16way <= count){// 16-way limit
 						std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 						std::size_t const halfcount{count >> 1};// rounded down
@@ -60041,10 +60135,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						indexsizeofpcall *= allowedthreadstemp;
 						std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *>(pfuturesplaceholder) + allowedthreadstemp};// 2 unused slots per split
 						std::byte *RSBD8_RESTRICT pindicesiter{reinterpret_cast<std::byte *>(pzeroedindices) + indexsizeofpcall};
-						asynchandle.assignspace(pfuturesiter - 2);// use the otherwise unused space
 						try{
 							// process the upper half (rounded up) separately if possible
-							asynchandle = std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
+							asynchandle = new(pfuturesiter - 2) std::future<std::future<void>>{std::async(std::launch::async, pcallsmaller, halfcounttop, allowedthreadstemp, pfuturesiter, pindicesiter, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...)};// use the otherwise unused space
 							pcall = pcallsmaller;
 							allowedthreads = allowedthreadstemp;
 							movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
