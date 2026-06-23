@@ -960,12 +960,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // this class is a simple RAII wrapper for the atomic variable when an exit state on destruction is needed
 // the barrier atomic variable must be able to signal if an exception occurs
 struct atomicvarwrapper{
-	std::atomic_uintptr_t &main;
+	std::atomic_uintptr_t &RSBD8_RESTRICT main;
 
 	// disable copy and move mechanisms
 	atomicvarwrapper(atomicvarwrapper const &) = delete;
 	atomicvarwrapper &operator=(atomicvarwrapper const &) = delete;
-	RSBD8_FUNC_INLINE atomicvarwrapper(std::atomic_uintptr_t &init)noexcept : main{init}{}
+	RSBD8_FUNC_INLINE atomicvarwrapper(std::atomic_uintptr_t &RSBD8_RESTRICT init)noexcept : main{init}{}
 	RSBD8_FUNC_INLINE ~atomicvarwrapper()noexcept{
 		if(std::uncaught_exceptions()){// this destructor is purely to handle exceptions
 			std::uintptr_t old{};// this function assumes that the barrier atomic variable freed state is zero
@@ -1023,7 +1023,7 @@ struct longdoubletest128{
 	std::uint_least64_t mantissa; std::uint_least64_t signexponent;// padded to 128 bits
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE bool operator==(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE bool operator==(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		std::uint_least16_t e{static_cast<std::uint_least16_t>(signexponent)};
 		std::uint_least64_t m{mantissa};
 		e ^= static_cast<std::uint_least16_t>(other.signexponent);
@@ -1033,7 +1033,7 @@ struct longdoubletest128{
 	}
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE auto operator<(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE auto operator<(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 		std::uint_least16_t eleft{static_cast<std::uint_least16_t>(signexponent)}, eright{static_cast<std::uint_least16_t>(other.signexponent)};
 		if constexpr(!isabsvalue && issignmode && !isfltpmode){// flip the high bit (use an unsigned comparison because of a lack of an overflow flag for the output)
@@ -1106,7 +1106,7 @@ struct longdoubletest128{
 	}
 
 	// warning: this minus operator performs subtraction with only the top part returned as result, used to propagate the sign bit next, and not the full difference
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE std::intptr_t operator-(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE std::intptr_t operator-(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
@@ -1168,7 +1168,7 @@ struct longdoubletest128{
 		return{longdoubletest128<isabsvalue, issignmode, isfltpmode>{~mantissa, ~signexponent}};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> &operator&=(std::intptr_t const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> &operator&=(std::intptr_t const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa &= static_cast<std::uint_least64_t>(other);
 		signexponent &= static_cast<std::uint_least64_t>(other);
@@ -1181,11 +1181,11 @@ struct longdoubletest128{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest128<isabsvalue, issignmode, isfltpmode>{*this} &= other};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> &operator^=(std::intptr_t const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> &operator^=(std::intptr_t const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa ^= static_cast<std::uint_least64_t>(other);
 		signexponent ^= static_cast<std::uint_least64_t>(other);
@@ -1198,11 +1198,11 @@ struct longdoubletest128{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest128<isabsvalue, issignmode, isfltpmode>{*this} ^= other};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> &operator|=(std::intptr_t const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> &operator|=(std::intptr_t const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa |= static_cast<std::uint_least64_t>(other);
 		signexponent |= static_cast<std::uint_least64_t>(other);
@@ -1215,11 +1215,11 @@ struct longdoubletest128{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest128<isabsvalue, issignmode, isfltpmode>{*this} |= other};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> &operator&=(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> &operator&=(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa &= other.mantissa;
 		signexponent &= other.signexponent;
@@ -1232,11 +1232,11 @@ struct longdoubletest128{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator&(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator&(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest128<isabsvalue, issignmode, isfltpmode>{*this} &= other};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> &operator^=(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> &operator^=(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa ^= other.mantissa;
 		signexponent ^= other.signexponent;
@@ -1249,11 +1249,11 @@ struct longdoubletest128{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator^(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator^(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest128<isabsvalue, issignmode, isfltpmode>{*this} ^= other};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> &operator|=(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> &operator|=(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa |= other.mantissa;
 		signexponent |= other.signexponent;
@@ -1266,7 +1266,7 @@ struct longdoubletest128{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator|(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator|(longdoubletest128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest128<isabsvalue, issignmode, isfltpmode>{*this} |= other};
 	}
 };
@@ -1278,7 +1278,7 @@ struct longdoubletest96{
 	std::uint_least64_t mantissa; std::uint_least32_t signexponent;// padded to 96 bits
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE bool operator==(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE bool operator==(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		std::uint_least16_t e{static_cast<std::uint_least16_t>(signexponent)};
 		std::uint_least64_t m{mantissa};
 		e ^= static_cast<std::uint_least16_t>(other.signexponent);
@@ -1288,7 +1288,7 @@ struct longdoubletest96{
 	}
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE auto operator<(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE auto operator<(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 		std::uint_least16_t eleft{static_cast<std::uint_least16_t>(signexponent)}, eright{static_cast<std::uint_least16_t>(other.signexponent)};
 		if constexpr(!isabsvalue && issignmode && !isfltpmode){// flip the high bit (use an unsigned comparison because of a lack of an overflow flag for the output)
@@ -1361,7 +1361,7 @@ struct longdoubletest96{
 	}
 
 	// warning: this minus operator performs subtraction with only the top part returned as result, used to propagate the sign bit next, and not the full difference
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE std::intptr_t operator-(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE std::intptr_t operator-(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
@@ -1423,7 +1423,7 @@ struct longdoubletest96{
 		return{longdoubletest96<isabsvalue, issignmode, isfltpmode>{~mantissa, ~signexponent}};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> &operator&=(std::intptr_t const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> &operator&=(std::intptr_t const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa &= static_cast<std::uint_least64_t>(other);
 #else
@@ -1434,11 +1434,11 @@ struct longdoubletest96{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest96<isabsvalue, issignmode, isfltpmode>{*this} &= other};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> &operator^=(std::intptr_t const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> &operator^=(std::intptr_t const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa ^= static_cast<std::uint_least64_t>(other);
 #else
@@ -1449,11 +1449,11 @@ struct longdoubletest96{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest96<isabsvalue, issignmode, isfltpmode>{*this} ^= other};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> &operator|=(std::intptr_t const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> &operator|=(std::intptr_t const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa |= static_cast<std::uint_least64_t>(other);
 #else
@@ -1464,11 +1464,11 @@ struct longdoubletest96{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest96<isabsvalue, issignmode, isfltpmode>{*this} |= other};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> &operator&=(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> &operator&=(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa &= other.mantissa;
 #else
@@ -1479,11 +1479,11 @@ struct longdoubletest96{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator&(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator&(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest96<isabsvalue, issignmode, isfltpmode>{*this} &= other};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> &operator^=(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> &operator^=(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa ^= other.mantissa;
 #else
@@ -1494,11 +1494,11 @@ struct longdoubletest96{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator^(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator^(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest96<isabsvalue, issignmode, isfltpmode>{*this} ^= other};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> &operator|=(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> &operator|=(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa |= other.mantissa;
 #else
@@ -1509,7 +1509,7 @@ struct longdoubletest96{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator|(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator|(longdoubletest96<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest96<isabsvalue, issignmode, isfltpmode>{*this} |= other};
 	}
 };
@@ -1520,7 +1520,7 @@ struct longdoubletest80{
 	std::uint_least64_t mantissa; std::uint_least16_t signexponent;
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE bool operator==(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE bool operator==(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		std::uint_least16_t e{signexponent};
 		std::uint_least64_t m{mantissa};
 		e ^= other.signexponent;
@@ -1530,7 +1530,7 @@ struct longdoubletest80{
 	}
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE auto operator<(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE auto operator<(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 		std::uint_least16_t eleft{signexponent}, eright{other.signexponent};
 		if constexpr(!isabsvalue && issignmode && !isfltpmode){// flip the high bit (use an unsigned comparison because of a lack of an overflow flag for the output)
@@ -1603,7 +1603,7 @@ struct longdoubletest80{
 	}
 
 	// warning: this minus operator performs subtraction with only the top part returned as result, used to propagate the sign bit next, and not the full difference
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE std::intptr_t operator-(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE std::intptr_t operator-(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
@@ -1665,7 +1665,7 @@ struct longdoubletest80{
 		return{longdoubletest80<isabsvalue, issignmode, isfltpmode>{~mantissa, ~signexponent}};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> &operator&=(std::intptr_t const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> &operator&=(std::intptr_t const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa &= static_cast<std::uint_least64_t>(other);
 #else
@@ -1676,11 +1676,11 @@ struct longdoubletest80{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest80<isabsvalue, issignmode, isfltpmode>{*this} &= other};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> &operator^=(std::intptr_t const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> &operator^=(std::intptr_t const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa ^= static_cast<std::uint_least64_t>(other);
 #else
@@ -1691,11 +1691,11 @@ struct longdoubletest80{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest80<isabsvalue, issignmode, isfltpmode>{*this} ^= other};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> &operator|=(std::intptr_t const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> &operator|=(std::intptr_t const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa |= static_cast<std::uint_least64_t>(other);
 #else
@@ -1706,11 +1706,11 @@ struct longdoubletest80{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest80<isabsvalue, issignmode, isfltpmode>{*this} |= other};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> &operator&=(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> &operator&=(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa &= other.mantissa;
 #else
@@ -1721,11 +1721,11 @@ struct longdoubletest80{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator&(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator&(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest80<isabsvalue, issignmode, isfltpmode>{*this} &= other};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> &operator^=(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> &operator^=(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa ^= other.mantissa;
 #else
@@ -1736,11 +1736,11 @@ struct longdoubletest80{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator^(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator^(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest80<isabsvalue, issignmode, isfltpmode>{*this} ^= other};
 	}
 
-	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> &operator|=(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> &operator|=(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa |= other.mantissa;
 #else
@@ -1751,7 +1751,7 @@ struct longdoubletest80{
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator|(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator|(longdoubletest80<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		return{longdoubletest80<isabsvalue, issignmode, isfltpmode>{*this} |= other};
 	}
 };
@@ -1930,7 +1930,7 @@ struct test64{
 	std::uint_least32_t data[2];
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE bool operator==(test64<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE bool operator==(test64<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		std::uint_least32_t a{data[0]};
 		std::uint_least32_t b{data[1]};
 		a ^= other.data[0];
@@ -1940,7 +1940,7 @@ struct test64{
 	}
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE auto operator<(test64<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE auto operator<(test64<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		std::size_t LO{}, HI{1u};// little-endian case
 		if constexpr(1u < sizeof(double)){
 			// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -1982,7 +1982,7 @@ struct test64{
 	}
 
 	// warning: this minus operator performs subtraction with only the top part returned as result, used to propagate the sign bit next, and not the full difference
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE std::intptr_t operator-(test64<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE std::intptr_t operator-(test64<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		if constexpr(1u < sizeof(double)){
 			// basic endianess detection, relies on proper inlining and compiler optimisation of that
 			static auto constexpr highbit{generatehighbit<std::conditional_t<isfltpmode, double, std::uint_least64_t>>()};
@@ -2026,68 +2026,68 @@ struct test64{
 		return{test64<isabsvalue, issignmode, isfltpmode>{~data[0], ~data[1]}};
 	}
 
-	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> &operator&=(std::intptr_t const &other)noexcept{
+	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> &operator&=(std::intptr_t const &RSBD8_RESTRICT other)noexcept{
 		data[0] &= static_cast<std::uint_least32_t>(other);
 		data[1] &= static_cast<std::uint_least32_t>(other);
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &RSBD8_RESTRICT other)const noexcept{
 		return{{data[0] & static_cast<std::uint_least32_t>(other),
 			data[1] & static_cast<std::uint_least32_t>(other)}};
 	}
 
-	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> &operator^=(std::intptr_t const &other)noexcept{
+	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> &operator^=(std::intptr_t const &RSBD8_RESTRICT other)noexcept{
 		data[0] ^= static_cast<std::uint_least32_t>(other);
 		data[1] ^= static_cast<std::uint_least32_t>(other);
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &RSBD8_RESTRICT other)const noexcept{
 		return{{data[0] ^ static_cast<std::uint_least32_t>(other),
 			data[1] ^ static_cast<std::uint_least32_t>(other)}};
 	}
 
-	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> &operator|=(std::intptr_t const &other)noexcept{
+	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> &operator|=(std::intptr_t const &RSBD8_RESTRICT other)noexcept{
 		data[0] |= static_cast<std::uint_least32_t>(other);
 		data[1] |= static_cast<std::uint_least32_t>(other);
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &RSBD8_RESTRICT other)const noexcept{
 		return{{data[0] | static_cast<std::uint_least32_t>(other),
 			data[1] | static_cast<std::uint_least32_t>(other)}};
 	}
 
-	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> &operator&=(test64<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> &operator&=(test64<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)noexcept{
 		data[0] &= other.data[0];
 		data[1] &= other.data[1];
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator&(test64<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator&(test64<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		return{{data[0] & other.data[0],
 			data[1] & other.data[1]}};
 	}
 
-	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> &operator^=(test64<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> &operator^=(test64<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)noexcept{
 		data[0] ^= other.data[0];
 		data[1] ^= other.data[1];
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator^(test64<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator^(test64<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		return{{data[0] ^ other.data[0],
 			data[1] ^ other.data[1]}};
 	}
 
-	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> &operator|=(test64<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> &operator|=(test64<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)noexcept{
 		data[0] |= other.data[0];
 		data[1] |= other.data[1];
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator|(test64<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator|(test64<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		return{{data[0] | other.data[0],
 			data[1] | other.data[1]}};
 	}
@@ -2144,7 +2144,7 @@ struct test128{
 	std::uint_least64_t data[2];
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE bool operator==(test128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE bool operator==(test128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		std::uint_least64_t a{data[0]};
 		std::uint_least64_t b{data[1]};
 		a ^= other.data[0];
@@ -2154,7 +2154,7 @@ struct test128{
 	}
 
 	// warning: this operator performs a plain unsigned comparison by default, or a signed comparison under standard signed template conditions, but not the absolute or floating-point variants
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE auto operator<(test128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE auto operator<(test128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		std::size_t LO{}, HI{1u};// little-endian case
 		if constexpr(1u < sizeof(std::uintmax_t)){
 			// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -2203,7 +2203,7 @@ struct test128{
 	}
 
 	// warning: this minus operator performs subtraction with only the top part returned as result, used to propagate the sign bit next, and not the full difference
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE std::intptr_t operator-(test128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE std::intptr_t operator-(test128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		if constexpr(1u < sizeof(std::uintmax_t)){
 			// basic endianess detection, relies on proper inlining and compiler optimisation of that
 			static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
@@ -2261,68 +2261,68 @@ struct test128{
 		return{test128<isabsvalue, issignmode, isfltpmode>{~data[0], ~data[1]}};
 	}
 
-	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> &operator&=(std::intptr_t const &other)noexcept{
+	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> &operator&=(std::intptr_t const &RSBD8_RESTRICT other)noexcept{
 		data[0] &= static_cast<std::uint_least64_t>(other);
 		data[1] &= static_cast<std::uint_least64_t>(other);
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &RSBD8_RESTRICT other)const noexcept{
 		return{{data[0] & static_cast<std::uint_least64_t>(other),
 			data[1] & static_cast<std::uint_least64_t>(other)}};
 	}
 
-	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> &operator^=(std::intptr_t const &other)noexcept{
+	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> &operator^=(std::intptr_t const &RSBD8_RESTRICT other)noexcept{
 		data[0] ^= static_cast<std::uint_least64_t>(other);
 		data[1] ^= static_cast<std::uint_least64_t>(other);
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator^(std::intptr_t const &RSBD8_RESTRICT other)const noexcept{
 		return{{data[0] ^ static_cast<std::uint_least64_t>(other),
 			data[1] ^ static_cast<std::uint_least64_t>(other)}};
 	}
 
-	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> &operator|=(std::intptr_t const &other)noexcept{
+	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> &operator|=(std::intptr_t const &RSBD8_RESTRICT other)noexcept{
 		data[0] |= static_cast<std::uint_least64_t>(other);
 		data[1] |= static_cast<std::uint_least64_t>(other);
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator|(std::intptr_t const &RSBD8_RESTRICT other)const noexcept{
 		return{{data[0] | static_cast<std::uint_least64_t>(other),
 			data[1] | static_cast<std::uint_least64_t>(other)}};
 	}
 
-	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> &operator&=(test128<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> &operator&=(test128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)noexcept{
 		data[0] &= other.data[0];
 		data[1] &= other.data[1];
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator&(test128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator&(test128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		return{{data[0] & other.data[0],
 			data[1] & other.data[1]}};
 	}
 
-	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> &operator^=(test128<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> &operator^=(test128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)noexcept{
 		data[0] ^= other.data[0];
 		data[1] ^= other.data[1];
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator^(test128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator^(test128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		return{{data[0] ^ other.data[0],
 			data[1] ^ other.data[1]}};
 	}
 
-	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> &operator|=(test128<isabsvalue, issignmode, isfltpmode> const &other)noexcept{
+	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> &operator|=(test128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)noexcept{
 		data[0] |= other.data[0];
 		data[1] |= other.data[1];
 		return{*this};
 	}
 
-	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator|(test128<isabsvalue, issignmode, isfltpmode> const &other)const noexcept{
+	RSBD8_NODISCARD RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator|(test128<isabsvalue, issignmode, isfltpmode> const &RSBD8_RESTRICT other)const noexcept{
 		return{{data[0] | other.data[0],
 			data[1] | other.data[1]}};
 	}
@@ -2854,7 +2854,7 @@ template<typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(U) &&
 	std::is_unsigned_v<U>,
-	void> addcarryofless(unsigned &accumulator, U minuend, U subtrahend)noexcept{
+	void> addcarryofless(unsigned &RSBD8_RESTRICT accumulator, U minuend, U subtrahend)noexcept{
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 	std::conditional_t<1u == sizeof(U), unsigned char,
 		std::conditional_t<sizeof(short) == sizeof(U), unsigned short,
@@ -2914,7 +2914,7 @@ template<typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(U) &&
 	std::is_unsigned_v<U>,
-	void> addcarryoflessorequal(unsigned &accumulator, U minuend, U subtrahend)noexcept{
+	void> addcarryoflessorequal(unsigned &RSBD8_RESTRICT accumulator, U minuend, U subtrahend)noexcept{
 	// the specialised versions actually calculate greater-than-or-equal, but with everything reversed
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 	std::conditional_t<1u == sizeof(U), unsigned char,
@@ -2976,7 +2976,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_same_v<std::size_t, unsigned> &&
 	64u >= CHAR_BIT * sizeof(U) &&
 	std::is_unsigned_v<U>,
-	void> addcarryofless(std::size_t &accumulator, U minuend, U subtrahend)noexcept{
+	void> addcarryofless(std::size_t &RSBD8_RESTRICT accumulator, U minuend, U subtrahend)noexcept{
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 	std::conditional_t<1u == sizeof(U), unsigned char,
 		std::conditional_t<sizeof(short) == sizeof(U), unsigned short,
@@ -3025,7 +3025,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_same_v<std::size_t, unsigned> &&
 	64u >= CHAR_BIT * sizeof(U) &&
 	std::is_unsigned_v<U>,
-	void> addcarryoflessorequal(std::size_t &accumulator, U minuend, U subtrahend)noexcept{
+	void> addcarryoflessorequal(std::size_t &RSBD8_RESTRICT accumulator, U minuend, U subtrahend)noexcept{
 	// the specialised versions actually calculate greater-than-or-equal, but with everything reversed
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 	std::conditional_t<1u == sizeof(U), unsigned char,
@@ -3222,7 +3222,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::ptrdiff_t initmtslicemain(std::size_t cou
 		i = static_cast<std::ptrdiff_t>(static_cast<std::size_t>(i) / allowedthreads);
 		unsigned slicesother{allowedthreads >> 1};
 		if(slicerem < slicesother) slicerem = slicesother;
-		i *= unassignedslice + 1u;// unassignedslice will usually be zero at this point
+		i += i * unassignedslice;// unassignedslice will usually be zero at this point
 		slicerem -= slicesother;
 		i += std::min(slicerem, unassignedslice);// only add on the remainder terms for this half
 		i = i * static_cast<std::ptrdiff_t>(itemsperloop) + rem - 1;// include the final remainder term for outside of the loop in the next part
@@ -3231,7 +3231,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::ptrdiff_t initmtslicemain(std::size_t cou
 		i = static_cast<std::ptrdiff_t>(static_cast<std::size_t>(i) / allowedthreads);
 		unsigned slicesother{allowedthreads >> 1};
 		if(slicerem < slicesother) slicerem = slicesother;
-		i *= unassignedslice + 1u;// unassignedslice will usually be zero at this point
+		i += i * unassignedslice;// unassignedslice will usually be zero at this point
 		slicerem -= slicesother;
 		i += std::min(slicerem, unassignedslice);// only add on the remainder terms for this half
 		--i;
@@ -3294,7 +3294,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::size_t initmtsliceswapsmain(std::size_t c
 	loc += rem;// include the final remainder term for outside of the loop in the next part
 	unsigned slicesother{allowedthreads >> 1};
 	if(slicerem < slicesother) slicerem = slicesother;
-	i *= unassignedslice + 1u;// unassignedslice will usually be zero at this point
+	i += i * unassignedslice;// unassignedslice will usually be zero at this point
 	slicerem -= slicesother;
 	i += std::min(slicerem, unassignedslice);// only add on the remainder terms for this half
 	loc += i * (itemsperloop >> 1);
@@ -3320,7 +3320,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtslic
 	loc += rem;// include the final remainder term for outside of the loop in the next part
 	unsigned slicesother{allowedthreads >> 1};
 	if(slicerem < slicesother) slicerem = slicesother;
-	i *= assignedslice + 1u;// assignedslice will usually be zero at this point
+	i += i * assignedslice;// assignedslice will usually be zero at this point
 	slicerem -= slicesother;
 	i += std::min(slicerem, assignedslice);// only add on the remainder terms for this half
 	loc += i * (itemsperloop >> 1);
@@ -11374,7 +11374,7 @@ nextsecondary:
 			// all loops here will usually inline and auto-vectorise items
 			// if more fine-tuning is required, manually vectorising this part shoud be easy for target architectures
 			if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to one at a time when there's very few registers
-				while(num)RSBD8_LIKELY{
+				do RSBD8_LIKELY{
 					if constexpr(isnoexcept) pfutures[0].~future();
 					auto const *RSBD8_RESTRICT p0{paddends[0].data()};
 					for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
@@ -11384,29 +11384,31 @@ nextsecondary:
 					}
 					if constexpr(isnoexcept) ++pfutures;
 					++paddends;
-					--num;
-				}
+				}while(--num);
 			}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to few at a time when there's few registers
-				while(3u <= num)RSBD8_UNLIKELY{
-					if constexpr(isnoexcept){
-						pfutures[0].~future();
-						pfutures[1].~future();
-						pfutures[2].~future();
-					}
-					auto const *RSBD8_RESTRICT p0{paddends[0].data()};
-					auto const *RSBD8_RESTRICT p1{paddends[1].data()};
-					auto const *RSBD8_RESTRICT p2{paddends[2].data()};
-					for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
-						auto aa{elem};
-						auto a0{*p0++};
-						aa += *p1++;
-						a0 += *p2++;
-						aa += a0;
-						elem = aa;
-					}
-					num -= 3u;
-					if constexpr(isnoexcept) pfutures += 3;
-					paddends += 3;
+				if(3u <= num)RSBD8_UNLIKELY{
+					do RSBD8_LIKELY{
+						if constexpr(isnoexcept){
+							pfutures[0].~future();
+							pfutures[1].~future();
+							pfutures[2].~future();
+						}
+						auto const *RSBD8_RESTRICT p0{paddends[0].data()};
+						auto const *RSBD8_RESTRICT p1{paddends[1].data()};
+						auto const *RSBD8_RESTRICT p2{paddends[2].data()};
+						for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
+							auto aa{elem};
+							auto a0{*p0++};
+							aa += *p1++;
+							a0 += *p2++;
+							aa += a0;
+							elem = aa;
+						}
+						num -= 3u;
+						if constexpr(isnoexcept) pfutures += 3;
+						paddends += 3;
+					}while(3u <= num);
+					if(!num) return;
 				}
 				if constexpr(isnoexcept) pfutures[0].~future();// the first item is guaranteed here
 				switch(num){
@@ -11435,40 +11437,43 @@ nextsecondary:
 					}
 				}
 			}else{// architecture: do not limit as much when there's a reasonable amount of registers
-				while(7u <= num)RSBD8_UNLIKELY{
-					if constexpr(isnoexcept){
-						pfutures[0].~future();
-						pfutures[1].~future();
-						pfutures[2].~future();
-						pfutures[3].~future();
-						pfutures[4].~future();
-						pfutures[5].~future();
-						pfutures[6].~future();
-					}
-					auto const *RSBD8_RESTRICT p0{paddends[0].data()};
-					auto const *RSBD8_RESTRICT p1{paddends[1].data()};
-					auto const *RSBD8_RESTRICT p2{paddends[2].data()};
-					auto const *RSBD8_RESTRICT p3{paddends[3].data()};
-					auto const *RSBD8_RESTRICT p4{paddends[4].data()};
-					auto const *RSBD8_RESTRICT p5{paddends[5].data()};
-					auto const *RSBD8_RESTRICT p6{paddends[6].data()};
-					for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
-						auto aa{elem};
-						auto a0{*p0++};
-						auto a1{*p1++};
-						auto a2{*p2++};
-						aa += *p3++;
-						a0 += *p4++;
-						a1 += *p5++;
-						a2 += *p6++;
-						aa += a0;
-						a1 += a2;
-						aa += a1;
-						elem = aa;
-					}
-					num -= 7u;
-					if constexpr(isnoexcept) pfutures += 7;
-					paddends += 7;
+				if(7u <= num)RSBD8_UNLIKELY{
+					do RSBD8_LIKELY{
+						if constexpr(isnoexcept){
+							pfutures[0].~future();
+							pfutures[1].~future();
+							pfutures[2].~future();
+							pfutures[3].~future();
+							pfutures[4].~future();
+							pfutures[5].~future();
+							pfutures[6].~future();
+						}
+						auto const *RSBD8_RESTRICT p0{paddends[0].data()};
+						auto const *RSBD8_RESTRICT p1{paddends[1].data()};
+						auto const *RSBD8_RESTRICT p2{paddends[2].data()};
+						auto const *RSBD8_RESTRICT p3{paddends[3].data()};
+						auto const *RSBD8_RESTRICT p4{paddends[4].data()};
+						auto const *RSBD8_RESTRICT p5{paddends[5].data()};
+						auto const *RSBD8_RESTRICT p6{paddends[6].data()};
+						for(auto &RSBD8_RESTRICT elem : *paccumulator)RSBD8_LIKELY{
+							auto aa{elem};
+							auto a0{*p0++};
+							auto a1{*p1++};
+							auto a2{*p2++};
+							aa += *p3++;
+							a0 += *p4++;
+							a1 += *p5++;
+							a2 += *p6++;
+							aa += a0;
+							a1 += a2;
+							aa += a1;
+							elem = aa;
+						}
+						num -= 7u;
+						if constexpr(isnoexcept) pfutures += 7;
+						paddends += 7;
+					}while(7u <= num);
+					if(!num) return;
 				}
 				if constexpr(isnoexcept) pfutures[0].~future();// the first item is guaranteed here
 				switch(num){
@@ -13953,7 +13958,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT , std::nullptr_t> atomiclightbarrier)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128u == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
 	assert(count && count != SIZE_MAX);
@@ -14527,14 +14532,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-	void> radixsortcopynoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pindices, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pzeroedindices, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -14542,9 +14547,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		if constexpr(isrevorder) radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(count, allowedthreads, 1u, std::ref(*pindices), input, output, buffer);
-		else radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, output);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		if constexpr(isrevorder) radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output, buffer);
+		else radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output);
 	}
 
 	// first barrier
@@ -14555,7 +14560,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pindices[-1].data())};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
@@ -14585,7 +14590,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pdst = output;
 			pdstnext = buffer;
 		}
-		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, pindices->data(), runsteps, atomiclightbarrier);
+		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, pzeroedindices->data(), runsteps, atomiclightbarrier);
 	}
 }
 
@@ -15078,20 +15083,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-	void> radixsortnoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pindices, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pzeroedindices, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(buffer);
 
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, buffer);
 	}
 
 	// first barrier
@@ -15102,7 +15107,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pindices[-1].data())};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
@@ -15132,7 +15137,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			psrclo = buffer;
 			pdst = input;
 		}
-		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, pindices->data(), runsteps, atomiclightbarrier);
+		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, pzeroedindices->data(), runsteps, atomiclightbarrier);
 	}
 }
 
@@ -16547,7 +16552,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT , std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U =
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -16698,7 +16703,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 			}
@@ -16936,7 +16941,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				if(!old) do RSBD8_LIKELY{
 					spinpause();
 					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the companion thread will never set it to one
+				}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
 				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 				}
@@ -17175,7 +17180,7 @@ handlebelowtop:
 						if(!old) do RSBD8_LIKELY{
 							spinpause();
 							old = atomiclightbarrier.load(std::memory_order_relaxed);
-						}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the companion thread will never set it to one
+						}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
 						if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 							if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 						}
@@ -17412,7 +17417,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortcopynoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pindices, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pzeroedindices, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -17420,7 +17425,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -17431,9 +17436,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		if constexpr(isrevorder) radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, output, buffer, varparameters...);
-		else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, output, varparameters...);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		if constexpr(isrevorder) radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output, buffer, varparameters...);
+		else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output, varparameters...);
 	}
 
 	// first barrier
@@ -17448,7 +17453,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pindices[-1].data())};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
@@ -17479,7 +17484,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pdst = output;
 			pdstnext = buffer;
 		}
-		radixsortnoallocmultisortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, pdst, pdstnext, pindices->data(), runsteps, atomiclightbarrier, varparameters...);
+		radixsortnoallocmultisortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, pdst, pdstnext, pzeroedindices->data(), runsteps, atomiclightbarrier, varparameters...);
 	}
 }
 
@@ -18196,13 +18201,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pindices, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pzeroedindices, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(buffer);
 
@@ -18212,8 +18217,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer, varparameters...);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, buffer, varparameters...);
 	}
 
 	// first barrier
@@ -18228,7 +18233,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pindices[-1].data())};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
@@ -18259,7 +18264,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			psrclo = buffer;
 			pdst = input;
 		}
-		radixsortnoallocmultisortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, psrclo, pdst, psrclo, pindices->data(), runsteps, atomiclightbarrier, varparameters...);
+		radixsortnoallocmultisortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, psrclo, pdst, psrclo, pzeroedindices->data(), runsteps, atomiclightbarrier, varparameters...);
 	}
 }
 
@@ -19576,7 +19581,7 @@ template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, boo
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT , std::nullptr_t> atomiclightbarrier)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -19840,14 +19845,14 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortcopynoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pindices, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pzeroedindices, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -19855,9 +19860,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		if constexpr(isrevorder) radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(count, allowedthreads, 1u, std::ref(*pindices), input, output, buffer);
-		else radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, output);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		if constexpr(isrevorder) radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output, buffer);
+		else radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output);
 	}
 
 	// first barrier
@@ -19868,7 +19873,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pindices[-1].data())};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
@@ -19898,7 +19903,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pdst = output;
 			pdstnext = buffer;
 		}
-		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, pindices->data(), runsteps, atomiclightbarrier);
+		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, pzeroedindices->data(), runsteps, atomiclightbarrier);
 	}
 }
 
@@ -20358,20 +20363,20 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pindices, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pzeroedindices, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(buffer);
 
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, buffer);
 	}
 
 	// first barrier
@@ -20382,7 +20387,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pindices[-1].data())};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
@@ -20412,7 +20417,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			psrclo = buffer;
 			pdst = input;
 		}
-		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, pindices->data(), runsteps, atomiclightbarrier);
+		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, pzeroedindices->data(), runsteps, atomiclightbarrier);
 	}
 }
 
@@ -21463,7 +21468,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT , std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
@@ -21650,7 +21655,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 			}
@@ -21818,7 +21823,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				if(!old) do RSBD8_LIKELY{
 					spinpause();
 					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the companion thread will never set it to one
+				}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
 				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 				}
@@ -21975,7 +21980,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortcopynoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pindices, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pzeroedindices, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -21983,7 +21988,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -21994,9 +21999,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		if constexpr(isrevorder) radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, output, buffer, varparameters...);
-		else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, output, varparameters...);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		if constexpr(isrevorder) radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output, buffer, varparameters...);
+		else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output, varparameters...);
 	}
 
 	// first barrier
@@ -22011,7 +22016,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pindices[-1].data())};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
@@ -22042,7 +22047,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pdst = output;
 			pdstnext = buffer;
 		}
-		radixsortnoallocmultisortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, pdst, pdstnext, pindices->data(), runsteps, atomiclightbarrier, varparameters...);
+		radixsortnoallocmultisortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, pdst, pdstnext, pzeroedindices->data(), runsteps, atomiclightbarrier, varparameters...);
 	}
 }
 
@@ -22699,21 +22704,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pindices, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pzeroedindices, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(buffer);
 
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer, varparameters...);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, buffer, varparameters...);
 	}
 
 	// first barrier
@@ -22728,7 +22733,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pindices[-1].data())};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
@@ -22759,7 +22764,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			psrclo = buffer;
 			pdst = input;
 		}
-		radixsortnoallocmultisortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, psrclo, pdst, psrclo, pindices->data(), runsteps, atomiclightbarrier, varparameters...);
+		radixsortnoallocmultisortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, psrclo, pdst, psrclo, pzeroedindices->data(), runsteps, atomiclightbarrier, varparameters...);
 	}
 }
 
@@ -24161,7 +24166,7 @@ template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, boo
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT , std::nullptr_t> atomiclightbarrier)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -24464,14 +24469,14 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortcopynoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pindices, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pzeroedindices, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -24479,9 +24484,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		if constexpr(isrevorder) radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(count, allowedthreads, 1u, std::ref(*pindices), input, output, buffer);
-		else radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, output);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		if constexpr(isrevorder) radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output, buffer);
+		else radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output);
 	}
 
 	// first barrier
@@ -24492,7 +24497,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pindices[-1].data())};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
@@ -24522,7 +24527,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pdst = output;
 			pdstnext = buffer;
 		}
-		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, pindices->data(), runsteps, atomiclightbarrier);
+		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, pzeroedindices->data(), runsteps, atomiclightbarrier);
 	}
 }
 
@@ -25008,11 +25013,11 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultimtc(std::size_t count, unsigned allowedthreads, void *RSBD8_RESTRICT pzeroedindices, void *RSBD8_RESTRICT pfuturesplaceholder, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pzeroedindices, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
-	assert(pfuturesplaceholder);
+	assert(pfutures);
 	assert(pzeroedindices);
 	assert(input);
 	assert(buffer);
@@ -25020,8 +25025,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, buffer);
 	}
 
 	// first barrier
@@ -25032,7 +25037,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pindices[-1].data())};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
@@ -25062,7 +25067,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			psrclo = buffer;
 			pdst = input;
 		}
-		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, pindices->data(), runsteps, atomiclightbarrier);
+		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, pzeroedindices->data(), runsteps, atomiclightbarrier);
 	}
 }
 
@@ -25084,7 +25089,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads, void *RSBD8_RESTRICT pfuturesplaceholder,
 #endif
-		void *RSBD8_RESTRICT pzeroedindices, void *RSBD8_RESTRICT pfuturesplaceholder, void *RSBD8_RESTRICT pzeroedindices, void *RSBD8_RESTRICT pfuturesplaceholder, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, bool movetobuffer = false)noexcept{
+		void *RSBD8_RESTRICT pzeroedindices, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, bool movetobuffer = false)noexcept{
 	// pfuturesplaceholder must point to a space of (allowedthreads - 2u) * sizeof(std::future<void>)
 	// pzeroedindices must point to a zeroed space of std::max(2u, allowedthreads) * sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>)
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -26524,7 +26529,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>),
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT , std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
@@ -26753,7 +26758,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 			}
@@ -26963,7 +26968,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				if(!old) do RSBD8_LIKELY{
 					spinpause();
 					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the companion thread will never set it to one
+				}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
 				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 				}
@@ -27162,13 +27167,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>),
-	void> radixsortcopynoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pindices, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pzeroedindices, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -27179,9 +27184,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		if constexpr(isrevorder) radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, output, buffer, varparameters...);
-		else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, output, varparameters...);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		if constexpr(isrevorder) radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output, buffer, varparameters...);
+		else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output, varparameters...);
 	}
 
 	// first barrier
@@ -27196,7 +27201,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pindices[-1].data())};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
@@ -27227,7 +27232,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pdst = output;
 			pdstnext = buffer;
 		}
-		radixsortnoallocmultisortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, pdst, pdstnext, pindices->data(), runsteps, atomiclightbarrier, varparameters...);
+		radixsortnoallocmultisortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, pdst, pdstnext, pzeroedindices->data(), runsteps, atomiclightbarrier, varparameters...);
 	}
 }
 
@@ -27986,13 +27991,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>),
-	void> radixsortnoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pindices, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pzeroedindices, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(buffer);
 
@@ -28002,8 +28007,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer, varparameters...);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, buffer, varparameters...);
 	}
 
 	// first barrier
@@ -28018,7 +28023,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pindices[-1].data())};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
@@ -28049,7 +28054,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			psrclo = buffer;
 			pdst = input;
 		}
-		radixsortnoallocmultisortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, psrclo, pdst, psrclo, pindices->data(), runsteps, atomiclightbarrier, varparameters...);
+		radixsortnoallocmultisortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, psrclo, pdst, psrclo, pzeroedindices->data(), runsteps, atomiclightbarrier, varparameters...);
 	}
 }
 
@@ -31780,7 +31785,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT , std::nullptr_t> atomiclightbarrier)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(count && count != SIZE_MAX);
 	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
@@ -31987,14 +31992,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortcopynoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pindices, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pzeroedindices, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -32002,9 +32007,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		if constexpr(isrevorder) radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(count, allowedthreads, 1u, std::ref(*pindices), input, output, buffer);
-		else radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, output);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		if constexpr(isrevorder) radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output, buffer);
+		else radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output);
 	}
 
 	// first barrier
@@ -32015,7 +32020,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pindices[-1].data())};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
@@ -32045,7 +32050,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pdst = output;
 			pdstnext = buffer;
 		}
-		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, pindices->data(), runsteps, atomiclightbarrier);
+		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, pzeroedindices->data(), runsteps, atomiclightbarrier);
 	}
 }
 
@@ -34046,20 +34051,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pindices, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pzeroedindices, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(buffer);
 
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, buffer);
 	}
 
 	// first barrier
@@ -34070,7 +34075,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pindices[-1].data())};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
@@ -34100,7 +34105,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			psrclo = buffer;
 			pdst = input;
 		}
-		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, pindices->data(), runsteps, atomiclightbarrier);
+		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, pzeroedindices->data(), runsteps, atomiclightbarrier);
 	}
 }
 
@@ -39922,7 +39927,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>) &&
 	8u < CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>),
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT , std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(count && count != SIZE_MAX);
@@ -40148,7 +40153,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				if(!old) do RSBD8_LIKELY{
 					spinpause();
 					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the companion thread will never set it to one
+				}while(1u == old);// prevent the ABA problem here, as the companion thread will never set it to one
 				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 				}
@@ -40348,7 +40353,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>) &&
 	8u < CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>),
-	void> radixsortcopynoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pindices, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pzeroedindices, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -40356,7 +40361,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -40367,9 +40372,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		if constexpr(isrevorder) radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, output, buffer, varparameters...);
-		else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, output, varparameters...);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		if constexpr(isrevorder) radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output, buffer, varparameters...);
+		else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output, varparameters...);
 	}
 
 	// first barrier
@@ -40384,7 +40389,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pindices[-1].data())};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
@@ -40415,7 +40420,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pdst = output;
 			pdstnext = buffer;
 		}
-		radixsortnoallocmultisortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, pdst, pdstnext, pindices->data(), runsteps, atomiclightbarrier, varparameters...);
+		radixsortnoallocmultisortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, pdst, pdstnext, pzeroedindices->data(), runsteps, atomiclightbarrier, varparameters...);
 	}
 }
 
@@ -43961,13 +43966,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>) &&
 	8u < CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>),
-	void> radixsortnoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pindices, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultimtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pzeroedindices, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(buffer);
 
@@ -43977,8 +43982,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer, varparameters...);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, buffer, varparameters...);
 	}
 
 	// first barrier
@@ -43993,7 +43998,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pindices[-1].data())};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
@@ -44024,7 +44029,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			psrclo = buffer;
 			pdst = input;
 		}
-		radixsortnoallocmultisortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, psrclo, pdst, psrclo, pindices->data(), runsteps, atomiclightbarrier, varparameters...);
+		radixsortnoallocmultisortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, psrclo, pdst, psrclo, pzeroedindices->data(), runsteps, atomiclightbarrier, varparameters...);
 	}
 }
 
@@ -48968,20 +48973,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	((isabsvalue && issignmode) ||// both regular absolute modes
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
-	void> radixsortcopynoallocsinglemtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pindices, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocsinglemtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pzeroedindices, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(output);
 
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, output);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output);
 	}
 
 	// first barrier
@@ -48992,7 +48997,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pindices[-1].data())};// isrevorder is set to false because it's useless when not using indirection
+	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pzeroedindices[-1].data())};// isrevorder is set to false because it's useless when not using indirection
 
 	// barrier and allareidentical value exchange with the main thread
 	++allareidentical;// send over a 1 or a 2
@@ -49010,7 +49015,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// 1: input from this thread
 
 	if(!allareidentical)RSBD8_LIKELY{
-		radixsortnoallocsinglesortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, input, output, pindices->data());
+		radixsortnoallocsinglesortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, input, output, pzeroedindices->data());
 	}
 }
 
@@ -49024,20 +49029,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	void> radixsortcopynoallocsinglesimplemtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pindices, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocsinglesimplemtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pzeroedindices, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(output);
 
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input);
 	}
 
 	// first barrier
@@ -49048,7 +49053,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// the single-part version without indirection here only has to do a linear fill based on the offsets, making this simpler than any other version
 	// process the actual sorting-by-filling sequence
-	radixsortnoallocsinglesimplesortmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, output, pindices[-1].data());
+	radixsortnoallocsinglesimplesortmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, output, pzeroedindices[-1].data());
 }
 
 // radixsortcopynoalloc() function implementation template for single-part types without indirection
@@ -49541,20 +49546,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	((isabsvalue && issignmode) ||// both regular absolute modes
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
-	void> radixsortnoallocsinglemtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pindices, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
+	void> radixsortnoallocsinglemtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pzeroedindices, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(buffer);
 
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, buffer);
 	}
 
 	// first barrier
@@ -49565,7 +49570,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pindices[-1].data())};
+	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pzeroedindices[-1].data())};
 
 	// barrier and allareidentical value exchange with the main thread
 	++allareidentical;// send over a 1 or a 2
@@ -49583,7 +49588,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// 1: input from this thread
 
 	if(!allareidentical)RSBD8_LIKELY{
-		radixsortnoallocsinglesortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, buffer, input, pindices->data());
+		radixsortnoallocsinglesortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, buffer, input, pzeroedindices->data());
 	}
 }
 
@@ -49597,18 +49602,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	void> radixsortnoallocsinglesimplemtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pindices, T *RSBD8_RESTRICT input, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
+	void> radixsortnoallocsinglesimplemtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> *RSBD8_RESTRICT pzeroedindices, T *RSBD8_RESTRICT input, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 
 	// generate the histograms for each part, all in one go
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(count, allowedthreads, 1u, std::ref(*pindices), input);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, true> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input);
 	}
 
 	// first barrier
@@ -49619,7 +49624,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// the single-part version without indirection here only has to do a linear fill based on the offsets, making this simpler than any other version
 	// process the actual sorting-by-filling sequence
-	radixsortnoallocsinglesimplesortmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, input, pindices[-1].data());
+	radixsortnoallocsinglesimplesortmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, input, pzeroedindices[-1].data());
 }
 
 // radixsortnoalloc() function implementation template for single-part types without indirection
@@ -50593,13 +50598,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>),
-	void> radixsortcopynoallocsinglemtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pindices, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocsinglemtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pzeroedindices, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(output);
 
@@ -50609,8 +50614,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, allowedthreads, 1u, std::ref(*pindices), input, output, varparameters...);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, output, varparameters...);
 	}
 
 	// first barrier
@@ -50625,7 +50630,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pindices[-1].data())};
+	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pzeroedindices[-1].data())};
 
 	// barrier and allareidentical value exchange with the main thread
 	// no exception detection required here
@@ -50644,7 +50649,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// 1: input from this thread
 
 	if(!allareidentical)RSBD8_LIKELY{
-		radixsortnoallocsinglesortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, output, pindices->data(), varparameters...);
+		radixsortnoallocsinglesortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, output, pzeroedindices->data(), varparameters...);
 	}
 }
 
@@ -51052,13 +51057,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>),
-	void> radixsortnoallocsinglemtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pindices, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocsinglemtc(std::size_t count, unsigned allowedthreads, std::future<void> *RSBD8_RESTRICT pfutures, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> *RSBD8_RESTRICT pzeroedindices, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(pfutures);
-	assert(pindices);
+	assert(pzeroedindices);
 	assert(input);
 	assert(buffer);
 
@@ -51068,8 +51073,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// combine the data from several threads at the end of the scope, this class provides exception safety when needed, too
 		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pindices + ((allowedthreads + 1u) >> 1), pindices, pfutures, (allowedthreads >> 1) - 1u};
-		radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, allowedthreads, 1u, std::ref(*pindices), input, buffer, varparameters...);
+		autoaccumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X, std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>> collect{pzeroedindices + ((allowedthreads + 1u) >> 1), pzeroedindices, pfutures, (allowedthreads >> 1) - 1u};
+		radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, allowedthreads, 1u, std::ref(*pzeroedindices), input, buffer, varparameters...);
 	}
 
 	// first barrier
@@ -51084,7 +51089,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pindices[-1].data())};
+	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pzeroedindices[-1].data())};
 
 	// barrier and allareidentical value exchange with the main thread
 	// no exception detection required here
@@ -51103,7 +51108,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// 1: input from this thread
 
 	if(!allareidentical)RSBD8_LIKELY{
-		radixsortnoallocsinglesortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, buffer, input, pindices->data(), varparameters...);
+		radixsortnoallocsinglesortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, buffer, input, pzeroedindices->data(), varparameters...);
 	}
 }
 
