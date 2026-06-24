@@ -11,25 +11,48 @@
 
 // This test suite and the library header allows some configuration with macros.
 // The library itself does not require any of its macros to be defined for normal operation.
-// the test batch size for the performance tests (8 GiB default)
+// the test batch sizes for the performance tests (8 GiB as the only entry in the array by default)
 // suggestions, all powers of 2 minus one except for the last item, to make sure most sorts of count leftover paths are touched inside the functions:
 // 0xFFuz, the 8-bit unsigned integer limit (allocates 2 MiB with regular large pages enabled)
 // 0xFFFFuz, the 16-bit unsigned integer limit (allocates 2 MiB with regular large pages enabled)
 // 0x3FFFFFFFuz, the largest number that will just allocate 1 GiB
 // 0xFFFFFFFFuz, the 32-bit unsigned integer limit (allocates 4 GiB)
 // 4294967311uz, the first prime number past the 32-bit unsigned integer limit, (allocates 4 GiB + 2 MiB with regular large pages enabled)
-#define RSBD8_TEST_BATCH_SIZE 4uz * 1024 * 1024 * 1024
+// source data pre-allocation will be done automatically with the largest value in the array
+// the RSBD8_TEST_BATCH_SIZE array is iterated from high to low for the test batches
+// 1 MiB down to 1 B, plus a test of 0 B, 22 small tests, note that time stamp readings from the very smallest tests will be relatively noisy and unreliable
+//static std::size_t constexpr RSBD8_TEST_BATCH_SIZE[]{0uz, 1uz, 2uz, 4uz, 8uz, 16uz, 32uz, 64uz, 128uz, 256uz, 512uz, 1024uz, 2uz * 1024, 4uz * 1024, 8uz * 1024, 16uz * 1024, 32uz * 1024, 64uz * 1024, 128uz * 1024, 256uz * 1024, 512uz * 1024, 1024uz * 1024};
+// 400 KiB to 176 KiB, 29 tests, useful for determining the single- to dual-threading limits for various types
+//static std::size_t constexpr RSBD8_TEST_BATCH_SIZE[]{176uz * 1024, 184uz * 1024, 192uz * 1024, 200uz * 1024, 208uz * 1024, 216uz * 1024, 224uz * 1024, 232uz * 1024, 240uz * 1024, 248uz * 1024, 256uz * 1024, 264uz * 1024, 272uz * 1024, 280uz * 1024, 288uz * 1024, 296uz * 1024, 304uz * 1024, 312uz * 1024, 320uz * 1024, 328uz * 1024, 336uz * 1024, 344uz * 1024, 352uz * 1024, 360uz * 1024, 368uz * 1024, 376uz * 1024, 384uz * 1024, 392uz * 1024, 400uz * 1024};
+// the three default tests of 8 KiB, 8 MiB and 8 GiB
+static std::size_t constexpr RSBD8_TEST_BATCH_SIZE[]{8uz * 1024 * 1024 * 1024, 8uz * 1024 * 1024, 8uz * 1024};
 // the entire benchmarks for the external std::sort() and std::stable_sort() functions can be disabled
 #ifdef _DEBUG// skip in debug builds by default to save a lot of time on these slow functions, and don't waste resources on unnecessary tests
 #define RSBD8_DISABLE_BENCHMARK_EXTERNAL
-#endif
+#endif// _DEBUG
+// the entire benchmarks for the copy version of the radix sort can be disabled to further reduce the test time
+#define RSBD8_DISABLE_BENCHMARK_COPYVERSION
+// the entire benchmarks for unsigned kinds of the radix sort can be disabled to further reduce the test time
+//#define RSBD8_DISABLE_BENCHMARK_UNSIGNED
+// the entire benchmarks for signed kinds of the radix sort can be disabled to further reduce the test time
+//#define RSBD8_DISABLE_BENCHMARK_SIGNED
+// the entire benchmarks for floating-point kinds of the radix sort can be disabled to further reduce the test time
+#define RSBD8_DISABLE_BENCHMARK_FLOATING
+// the entire benchmarks for all direct array sorting versions of the radix sort can be disabled to further reduce the test time
+//#define RSBD8_DISABLE_BENCHMARK_DIRECT
+// the entire benchmarks for all indirect array sorting versions of the radix sort can be disabled to further reduce the test time
+#define RSBD8_DISABLE_BENCHMARK_INDIRECT
+// displaying the window at the end can be disabled for automation
+#define RSBD8_DISABLE_BENCHMARK_WINDOW
 // the maximum and minimum number of threads to use for the performance tests can optionally be set here
 // Available hardware threads are always obtained with std::thread::hardware_concurrency() when RSBD8_THREAD_MAXIMUM is above 1, even if RSBD8_THREAD_MINIMUM is defined.
 // This implies that testing with multithreading enabled is always limited to the number of hardware threads available.
-#define RSBD8_THREAD_MAXIMUM 2
+//#define RSBD8_THREAD_MAXIMUM 99
 //#define RSBD8_THREAD_MINIMUM 1
 
 #include "..\..\Radixsortbidi8.hpp"
+#include <execution>
+#include <algorithm>
 
 // disable warning messages for this file only:
 // C4559: 'x': redefinition; the function gains __declspec(noalias)
@@ -374,6 +397,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 	}
 
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	{// unit tests with the 3 simulated 80-bit long double types
 		// direct sorting tests with the 80-bit long double types
 
@@ -385,8 +409,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			{0, 1u},// min normal
 			{0xFFFFFFFFFFFFFFFFu, 0},// max subnormal
 			{1u, 0}};// min subnormal
-		rsbd8::helper::longdoubletest80<false, true, true> ajo80[_countof(aji80)], ajb80[_countof(aji80)];
-		rsbd8::radixsortcopynoalloc(_countof(aji80), aji80, ajo80, ajb80);
+		rsbd8::helper::longdoubletest80<false, true, true> ajo80[_countof(aji80)];
+		rsbd8::radixsortcopy(_countof(aji80), aji80, ajo80);
 		assert(ajo80[0].mantissa == 0x8000000000000000u && ajo80[0].signexponent == 0xFFFFu);// QNaN, machine indeterminate
 		assert(ajo80[1].mantissa == 0 && ajo80[1].signexponent == 0xFFFFu);// -inf
 		assert(ajo80[2].mantissa == 1u && ajo80[2].signexponent == 0);// min subnormal
@@ -395,15 +419,14 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(ajo80[5].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo80[5].signexponent == 0x7FFEu);// max normal
 		assert(ajo80[6].mantissa == 0 && ajo80[6].signexponent == 0x7FFFu);// +inf
 
-		std::memset(ajb80, 0, sizeof(ajb80));
-		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aji80), ajo80, ajb80, true);
-		assert(ajb80[0].mantissa == 0 && ajb80[0].signexponent == 0x7FFFu);// +inf
-		assert(ajb80[1].mantissa == 0xFFFFFFFFFFFFFFFFu && ajb80[1].signexponent == 0x7FFEu);// max normal
-		assert(ajb80[2].mantissa == 0 && ajb80[2].signexponent == 1u);// min normal
-		assert(ajb80[3].mantissa == 0xFFFFFFFFFFFFFFFFu && ajb80[3].signexponent == 0);// max subnormal
-		assert(ajb80[4].mantissa == 1u && ajb80[4].signexponent == 0);// min subnormal
-		assert(ajb80[5].mantissa == 0 && ajb80[5].signexponent == 0xFFFFu);// -inf
-		assert(ajb80[6].mantissa == 0x8000000000000000u && ajb80[6].signexponent == 0xFFFFu);// QNaN, machine indeterminate
+		rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(_countof(aji80), aji80, ajo80);
+		assert(ajo80[0].mantissa == 0 && ajo80[0].signexponent == 0x7FFFu);// +inf
+		assert(ajo80[1].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo80[1].signexponent == 0x7FFEu);// max normal
+		assert(ajo80[2].mantissa == 0 && ajo80[2].signexponent == 1u);// min normal
+		assert(ajo80[3].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo80[3].signexponent == 0);// max subnormal
+		assert(ajo80[4].mantissa == 1u && ajo80[4].signexponent == 0);// min subnormal
+		assert(ajo80[5].mantissa == 0 && ajo80[5].signexponent == 0xFFFFu);// -inf
+		assert(ajo80[6].mantissa == 0x8000000000000000u && ajo80[6].signexponent == 0xFFFFu);// QNaN, machine indeterminate
 
 		rsbd8::helper::longdoubletest96<false, true, true> aji96[7]{
 			{0, 0xABABFFFFu},// -inf
@@ -413,8 +436,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			{0, 0xFFF80001u},// min normal
 			{0xFFFFFFFFFFFFFFFFu, 0xC7C80000u},// max subnormal
 			{1u, 0xB3710000u}};// min subnormal
-		rsbd8::helper::longdoubletest96<false, true, true> ajo96[_countof(aji96)], ajb96[_countof(aji96)];
-		rsbd8::radixsortcopynoalloc(_countof(aji96), aji96, ajo96, ajb96);
+		rsbd8::helper::longdoubletest96<false, true, true> ajo96[_countof(aji96)];
+		rsbd8::radixsortcopy(_countof(aji96), aji96, ajo96);
 		assert(ajo96[0].mantissa == 0x8000000000000000u && ajo96[0].signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
 		assert(ajo96[1].mantissa == 0 && ajo96[1].signexponent == 0xABABFFFFu);// -inf
 		assert(ajo96[2].mantissa == 1u && ajo96[2].signexponent == 0xB3710000u);// min subnormal
@@ -423,15 +446,14 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(ajo96[5].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo96[5].signexponent == 0x01017FFEu);// max normal
 		assert(ajo96[6].mantissa == 0 && ajo96[6].signexponent == 0xD0017FFFu);// +inf
 
-		std::memset(ajb96, 0, sizeof(ajb96));
-		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aji96), ajo96, ajb96, true);
-		assert(ajb96[0].mantissa == 0 && ajb96[0].signexponent == 0xD0017FFFu);// +inf
-		assert(ajb96[1].mantissa == 0xFFFFFFFFFFFFFFFFu && ajb96[1].signexponent == 0x01017FFEu);// max normal
-		assert(ajb96[2].mantissa == 0 && ajb96[2].signexponent == 0xFFF80001u);// min normal
-		assert(ajb96[3].mantissa == 0xFFFFFFFFFFFFFFFFu && ajb96[3].signexponent == 0xC7C80000u);// max subnormal
-		assert(ajb96[4].mantissa == 1u && ajb96[4].signexponent == 0xB3710000u);// min subnormal
-		assert(ajb96[5].mantissa == 0 && ajb96[5].signexponent == 0xABABFFFFu);// -inf
-		assert(ajb96[6].mantissa == 0x8000000000000000u && ajb96[6].signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
+		rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(_countof(aji96), aji96, ajo96);
+		assert(ajo96[0].mantissa == 0 && ajo96[0].signexponent == 0xD0017FFFu);// +inf
+		assert(ajo96[1].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo96[1].signexponent == 0x01017FFEu);// max normal
+		assert(ajo96[2].mantissa == 0 && ajo96[2].signexponent == 0xFFF80001u);// min normal
+		assert(ajo96[3].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo96[3].signexponent == 0xC7C80000u);// max subnormal
+		assert(ajo96[4].mantissa == 1u && ajo96[4].signexponent == 0xB3710000u);// min subnormal
+		assert(ajo96[5].mantissa == 0 && ajo96[5].signexponent == 0xABABFFFFu);// -inf
+		assert(ajo96[6].mantissa == 0x8000000000000000u && ajo96[6].signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
 
 		rsbd8::helper::longdoubletest128<false, true, true> aji128[7]{
 			{0, 0xBBBBAAAAABABFFFFu},// -inf
@@ -441,8 +463,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			{0, 0x88887777FFF80001u},// min normal
 			{0xFFFFFFFFFFFFFFFFu, 0xCCCC9999C7C80000u},// max subnormal
 			{1u, 0xFFFFDDDDB3710000u}};// min subnormal
-		rsbd8::helper::longdoubletest128<false, true, true> ajo128[_countof(aji128)], ajb128[_countof(aji128)];
-		rsbd8::radixsortcopynoalloc(_countof(aji128), aji128, ajo128, ajb128);
+		rsbd8::helper::longdoubletest128<false, true, true> ajo128[_countof(aji128)];
+		rsbd8::radixsortcopy(_countof(aji128), aji128, ajo128);
 		assert(ajo128[0].mantissa == 0x8000000000000000u && ajo128[0].signexponent == 0x44443333EEEEFFFFu);// QNaN, machine indeterminate
 		assert(ajo128[1].mantissa == 0 && ajo128[1].signexponent == 0xBBBBAAAAABABFFFFu);// -inf
 		assert(ajo128[2].mantissa == 1u && ajo128[2].signexponent == 0xFFFFDDDDB3710000u);// min subnormal
@@ -451,21 +473,20 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(ajo128[5].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo128[5].signexponent == 0x6666555501017FFEu);// max normal
 		assert(ajo128[6].mantissa == 0 && ajo128[6].signexponent == 0x22221111D0017FFFu);// +inf
 
-		std::memset(ajb128, 0, sizeof(ajb128));
-		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aji128), ajo128, ajb128, true);
-		assert(ajb128[0].mantissa == 0 && ajb128[0].signexponent == 0x22221111D0017FFFu);// +inf
-		assert(ajb128[1].mantissa == 0xFFFFFFFFFFFFFFFFu && ajb128[1].signexponent == 0x6666555501017FFEu);// max normal
-		assert(ajb128[2].mantissa == 0 && ajb128[2].signexponent == 0x88887777FFF80001u);// min normal
-		assert(ajb128[3].mantissa == 0xFFFFFFFFFFFFFFFFu && ajb128[3].signexponent == 0xCCCC9999C7C80000u);// max subnormal
-		assert(ajb128[4].mantissa == 1u && ajb128[4].signexponent == 0xFFFFDDDDB3710000u);// min subnormal
-		assert(ajb128[5].mantissa == 0 && ajb128[5].signexponent == 0xBBBBAAAAABABFFFFu);// -inf
-		assert(ajb128[6].mantissa == 0x8000000000000000u && ajb128[6].signexponent == 0x44443333EEEEFFFFu);// QNaN, machine indeterminate
+		rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(_countof(aji128), aji128, ajo128);
+		assert(ajo128[0].mantissa == 0 && ajo128[0].signexponent == 0x22221111D0017FFFu);// +inf
+		assert(ajo128[1].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo128[1].signexponent == 0x6666555501017FFEu);// max normal
+		assert(ajo128[2].mantissa == 0 && ajo128[2].signexponent == 0x88887777FFF80001u);// min normal
+		assert(ajo128[3].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo128[3].signexponent == 0xCCCC9999C7C80000u);// max subnormal
+		assert(ajo128[4].mantissa == 1u && ajo128[4].signexponent == 0xFFFFDDDDB3710000u);// min subnormal
+		assert(ajo128[5].mantissa == 0 && ajo128[5].signexponent == 0xBBBBAAAAABABFFFFu);// -inf
+		assert(ajo128[6].mantissa == 0x8000000000000000u && ajo128[6].signexponent == 0x44443333EEEEFFFFu);// QNaN, machine indeterminate
 
 		// basic indirect sorting tests with the 80-bit long double types
 
-		rsbd8::helper::longdoubletest80<false, true, true> *ako80[_countof(aji80)], *akb80[_countof(aji80)], *aki80[_countof(aji80)]{
+		rsbd8::helper::longdoubletest80<false, true, true> *ako80[_countof(aji80)], *aki80[_countof(aji80)]{
 			aji80, aji80 + 1, aji80 + 2, aji80 + 3, aji80 + 4, aji80 + 5, aji80 + 6};// indirect input
-		rsbd8::radixsortcopynoalloc(_countof(aki80), aki80, ako80, akb80);
+		rsbd8::radixsortcopy(_countof(aki80), aki80, ako80);
 		assert(ako80[0]->mantissa == 0x8000000000000000u && ako80[0]->signexponent == 0xFFFFu);// QNaN, machine indeterminate
 		assert(ako80[1]->mantissa == 0 && ako80[1]->signexponent == 0xFFFFu);// -inf
 		assert(ako80[2]->mantissa == 1u && ako80[2]->signexponent == 0);// min subnormal
@@ -474,19 +495,18 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(ako80[5]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako80[5]->signexponent == 0x7FFEu);// max normal
 		assert(ako80[6]->mantissa == 0 && ako80[6]->signexponent == 0x7FFFu);// +inf
 
-		std::memset(akb80, 0, sizeof(akb80));
-		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aki80), ako80, akb80, true);
-		assert(akb80[0]->mantissa == 0 && akb80[0]->signexponent == 0x7FFFu);// +inf
-		assert(akb80[1]->mantissa == 0xFFFFFFFFFFFFFFFFu && akb80[1]->signexponent == 0x7FFEu);// max normal
-		assert(akb80[2]->mantissa == 0 && akb80[2]->signexponent == 1u);// min normal
-		assert(akb80[3]->mantissa == 0xFFFFFFFFFFFFFFFFu && akb80[3]->signexponent == 0);// max subnormal
-		assert(akb80[4]->mantissa == 1u && akb80[4]->signexponent == 0);// min subnormal
-		assert(akb80[5]->mantissa == 0 && akb80[5]->signexponent == 0xFFFFu);// -inf
-		assert(akb80[6]->mantissa == 0x8000000000000000u && akb80[6]->signexponent == 0xFFFFu);// QNaN, machine indeterminate
+		rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(_countof(aki80), aki80, ako80);
+		assert(ako80[0]->mantissa == 0 && ako80[0]->signexponent == 0x7FFFu);// +inf
+		assert(ako80[1]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako80[1]->signexponent == 0x7FFEu);// max normal
+		assert(ako80[2]->mantissa == 0 && ako80[2]->signexponent == 1u);// min normal
+		assert(ako80[3]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako80[3]->signexponent == 0);// max subnormal
+		assert(ako80[4]->mantissa == 1u && ako80[4]->signexponent == 0);// min subnormal
+		assert(ako80[5]->mantissa == 0 && ako80[5]->signexponent == 0xFFFFu);// -inf
+		assert(ako80[6]->mantissa == 0x8000000000000000u && ako80[6]->signexponent == 0xFFFFu);// QNaN, machine indeterminate
 
-		rsbd8::helper::longdoubletest96<false, true, true> *ako96[_countof(aji96)], *akb96[_countof(aji96)], *aki96[_countof(aji96)]{
+		rsbd8::helper::longdoubletest96<false, true, true> *ako96[_countof(aji96)], *aki96[_countof(aji96)]{
 			aji96, aji96 + 1, aji96 + 2, aji96 + 3, aji96 + 4, aji96 + 5, aji96 + 6};// indirect input
-		rsbd8::radixsortcopynoalloc(_countof(aki96), aki96, ako96, akb96);
+		rsbd8::radixsortcopy(_countof(aki96), aki96, ako96);
 		assert(ako96[0]->mantissa == 0x8000000000000000u && ako96[0]->signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
 		assert(ako96[1]->mantissa == 0 && ako96[1]->signexponent == 0xABABFFFFu);// -inf
 		assert(ako96[2]->mantissa == 1u && ako96[2]->signexponent == 0xB3710000u);// min subnormal
@@ -495,19 +515,18 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(ako96[5]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako96[5]->signexponent == 0x01017FFEu);// max normal
 		assert(ako96[6]->mantissa == 0 && ako96[6]->signexponent == 0xD0017FFFu);// +inf
 
-		std::memset(akb96, 0, sizeof(akb96));
-		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aki96), ako96, akb96, true);
-		assert(akb96[0]->mantissa == 0 && akb96[0]->signexponent == 0xD0017FFFu);// +inf
-		assert(akb96[1]->mantissa == 0xFFFFFFFFFFFFFFFFu && akb96[1]->signexponent == 0x01017FFEu);// max normal
-		assert(akb96[2]->mantissa == 0 && akb96[2]->signexponent == 0xFFF80001u);// min normal
-		assert(akb96[3]->mantissa == 0xFFFFFFFFFFFFFFFFu && akb96[3]->signexponent == 0xC7C80000u);// max subnormal
-		assert(akb96[4]->mantissa == 1u && akb96[4]->signexponent == 0xB3710000u);// min subnormal
-		assert(akb96[5]->mantissa == 0 && akb96[5]->signexponent == 0xABABFFFFu);// -inf
-		assert(akb96[6]->mantissa == 0x8000000000000000u && akb96[6]->signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
+		rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(_countof(aki96), aki96, ako96);
+		assert(ako96[0]->mantissa == 0 && ako96[0]->signexponent == 0xD0017FFFu);// +inf
+		assert(ako96[1]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako96[1]->signexponent == 0x01017FFEu);// max normal
+		assert(ako96[2]->mantissa == 0 && ako96[2]->signexponent == 0xFFF80001u);// min normal
+		assert(ako96[3]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako96[3]->signexponent == 0xC7C80000u);// max subnormal
+		assert(ako96[4]->mantissa == 1u && ako96[4]->signexponent == 0xB3710000u);// min subnormal
+		assert(ako96[5]->mantissa == 0 && ako96[5]->signexponent == 0xABABFFFFu);// -inf
+		assert(ako96[6]->mantissa == 0x8000000000000000u && ako96[6]->signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
 
-		rsbd8::helper::longdoubletest128<false, true, true> *ako128[_countof(aji128)], *akb128[_countof(aji128)], *aki128[_countof(aji128)]{
+		rsbd8::helper::longdoubletest128<false, true, true> *ako128[_countof(aji128)], *aki128[_countof(aji128)]{
 			aji128, aji128 + 1, aji128 + 2, aji128 + 3, aji128 + 4, aji128 + 5, aji128 + 6};// indirect input
-		rsbd8::radixsortcopynoalloc(_countof(aki128), aki128, ako128, akb128);
+		rsbd8::radixsortcopy(_countof(aki128), aki128, ako128);
 		assert(ako128[0]->mantissa == 0x8000000000000000u && ako128[0]->signexponent == 0x44443333EEEEFFFFu);// QNaN, machine indeterminate
 		assert(ako128[1]->mantissa == 0 && ako128[1]->signexponent == 0xBBBBAAAAABABFFFFu);// -inf
 		assert(ako128[2]->mantissa == 1u && ako128[2]->signexponent == 0xFFFFDDDDB3710000u);// min subnormal
@@ -516,15 +535,14 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(ako128[5]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako128[5]->signexponent == 0x6666555501017FFEu);// max normal
 		assert(ako128[6]->mantissa == 0 && ako128[6]->signexponent == 0x22221111D0017FFFu);// +inf
 
-		std::memset(akb128, 0, sizeof(akb128));
-		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aki128), ako128, akb128, true);
-		assert(akb128[0]->mantissa == 0 && akb128[0]->signexponent == 0x22221111D0017FFFu);// +inf
-		assert(akb128[1]->mantissa == 0xFFFFFFFFFFFFFFFFu && akb128[1]->signexponent == 0x6666555501017FFEu);// max normal
-		assert(akb128[2]->mantissa == 0 && akb128[2]->signexponent == 0x88887777FFF80001u);// min normal
-		assert(akb128[3]->mantissa == 0xFFFFFFFFFFFFFFFFu && akb128[3]->signexponent == 0xCCCC9999C7C80000u);// max subnormal
-		assert(akb128[4]->mantissa == 1u && akb128[4]->signexponent == 0xFFFFDDDDB3710000u);// min subnormal
-		assert(akb128[5]->mantissa == 0 && akb128[5]->signexponent == 0xBBBBAAAAABABFFFFu);// -inf
-		assert(akb128[6]->mantissa == 0x8000000000000000u && akb128[6]->signexponent == 0x44443333EEEEFFFFu);// QNaN, machine indeterminate
+		rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(_countof(aki128), aki128, ako128);
+		assert(ako128[0]->mantissa == 0 && ako128[0]->signexponent == 0x22221111D0017FFFu);// +inf
+		assert(ako128[1]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako128[1]->signexponent == 0x6666555501017FFEu);// max normal
+		assert(ako128[2]->mantissa == 0 && ako128[2]->signexponent == 0x88887777FFF80001u);// min normal
+		assert(ako128[3]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako128[3]->signexponent == 0xCCCC9999C7C80000u);// max subnormal
+		assert(ako128[4]->mantissa == 1u && ako128[4]->signexponent == 0xFFFFDDDDB3710000u);// min subnormal
+		assert(ako128[5]->mantissa == 0 && ako128[5]->signexponent == 0xBBBBAAAAABABFFFFu);// -inf
+		assert(ako128[6]->mantissa == 0x8000000000000000u && ako128[6]->signexponent == 0x44443333EEEEFFFFu);// QNaN, machine indeterminate
 	}
 
 	{// simple unit tests, mostly to track template compile-time issues
@@ -540,26 +558,24 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// test sequence 0B_iqUE (oblique), with one item from each row; 0:0, 10:i, 20:q, 30:B, 40:E, 50:U, 60:_
 		static cert_v_binencoding64 constexpr tein[7]{$0, $B, $_, $i, $q, $U, $E};
 		cert_v_binencoding64 teout[_countof(tein)];
-		cert_v_binencoding64 tebuf[_countof(tein)];// dummy, as it's an 8-bit type
-		rsbd8::radixsortcopynoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(tein), tein, teout, tebuf);
+		rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(_countof(tein), tein, teout);
 		assert(teout[0] == $_ && teout[1] == $U && teout[2] == $E && teout[3] == $B && teout[4] == $q && teout[5] == $i && teout[6] == $0);
-		rsbd8::radixsortcopynoalloc<rsbd8::sortingdirection::ascfwdorder>(_countof(tein), tein, teout);
+		rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder>(_countof(tein), tein, teout);
 		assert(teout[0] == $0 && teout[1] == $i && teout[2] == $q && teout[3] == $B && teout[4] == $E && teout[5] == $U && teout[6] == $_);
 
-		// 1 unit test: radixsortnoalloc(), write to buffer, float (multi-byte), no indirection, (implicit template statement) ascending
+		// 1 unit test: radixsort(), write to buffer, float (multi-byte), no indirection, (implicit template statement) ascending
 		std::uint32_t inm[7]{8, 0, 3, 1u << 31 | 2, 3, 1u << 31 | 18, 1u << 31 | 2};
 		std::uint32_t outm[_countof(inm)];
-		rsbd8::radixsortnoalloc(_countof(inm), reinterpret_cast<float *>(inm), reinterpret_cast<float *>(outm), true);
+		rsbd8::radixsortcopy(_countof(inm), reinterpret_cast<float *>(inm), reinterpret_cast<float *>(outm));
 		assert(outm[0] == (1u << 31 | 18) && outm[1] == (1u << 31 | 2) && outm[2] == (1u << 31 | 2) && outm[3] == 0 && outm[4] == 3 && outm[5] == 3 && outm[6] == 8);
 
 		// 2 unit test, the same as above, but indirect
 		std::uint32_t const *inim[7]{outm + 6, outm + 3, outm + 4, outm + 1, outm + 5, outm, outm + 2};
 		std::uint32_t const *outim[_countof(inim)];
-		std::uint32_t const *bufim[_countof(inim)];
-		rsbd8::radixsortcopynoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(inim), reinterpret_cast<float const *const *>(inim), reinterpret_cast<float const **>(outim), reinterpret_cast<float const **>(bufim));
+		rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(_countof(inim), reinterpret_cast<float const *const *>(inim), reinterpret_cast<float const **>(outim));
 		assert(outim[0] == inim[0] && outim[1] == inim[4] && outim[2] == inim[2] && outim[3] == inim[1] && outim[4] == inim[6] && outim[5] == inim[3] && outim[6] == inim[5]);
-		rsbd8::radixsortnoalloc(_countof(inim), reinterpret_cast<float const **>(inim), reinterpret_cast<float const **>(bufim), false);
-		assert(*inim[0] == (1u << 31 | 18) && *inim[1] == (1u << 31 | 2) && *inim[2] == (1u << 31 | 2) && *inim[3] == 0 && *inim[4] == 3 && *inim[5] == 3 && *inim[6] == 8);
+		rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder>(_countof(inim), reinterpret_cast<float const **>(inim), reinterpret_cast<float const **>(outim));
+		assert(*outim[0] == (1u << 31 | 18) && *outim[1] == (1u << 31 | 2) && *outim[2] == (1u << 31 | 2) && *outim[3] == 0 && *outim[4] == 3 && *outim[5] == 3 && *outim[6] == 8);
 
 		// 6 groups of short unit tests: radixsortcopynoalloc() (and one directly to its implementation), 8-byte with first level getter indirection, (implicit template statement) ascending
 		// Part of this test is firing up the debugger in "release mode" to see how well the inlining parallel processing fares, or just read the asm output functions directly. (This generates quite a few similar functions for the various cases though.)
@@ -588,56 +604,56 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		Testmeclass cin[]{8, 0, 6, 4, 0, 2, 6};
 		Testmeclass const *fin[_countof(cin)]{cin, cin + 1, cin + 2, cin + 3, cin + 4, cin + 5, cin + 6};
 		Testmeclass const *fout[_countof(cin)];
-		Testmeclass const *fbuf[_countof(cin)];
 
-		rsbd8::radixsortcopynoalloc<&Testmeclass::get>(_countof(fin), fin, fout, fbuf);
-		rsbd8::radixsortcopynoalloc<&Testmeclass::getwparam>(_countof(fin), fin, fout, fbuf, 8);
-		rsbd8::radixsortcopynoalloc<&Testmeclass::co>(_countof(fin), fin, fout, fbuf);
-		rsbd8::radixsortcopynoalloc<std::uint64_t, 9>(_countof(fin), fin, fout, fbuf);
+		rsbd8::radixsortcopy<&Testmeclass::get>(_countof(fin), fin, fout);
+		rsbd8::radixsortcopy<&Testmeclass::getwparam>(_countof(fin), fin, fout, 0, 8);
+		rsbd8::radixsortcopy<&Testmeclass::co>(_countof(fin), fin, fout);
+		rsbd8::radixsortcopy<std::uint64_t, 9>(_countof(fin), fin, fout);
 
-		rsbd8::radixsortcopynoalloc<&Testmeclass::sget>(_countof(fin), fin, fout, fbuf);
-		rsbd8::radixsortcopynoalloc<&Testmeclass::sco>(_countof(fin), fin, fout, fbuf);
-		rsbd8::radixsortcopynoalloc<std::int64_t, 17>(_countof(fin), fin, fout, fbuf);
+		rsbd8::radixsortcopy<&Testmeclass::sget>(_countof(fin), fin, fout);
+		rsbd8::radixsortcopy<&Testmeclass::sco>(_countof(fin), fin, fout);
+		rsbd8::radixsortcopy<std::int64_t, 17>(_countof(fin), fin, fout);
 
 		// correctly fails to compile (not const-correct):
-		//rsbd8::radixsortcopynoalloc<&Testmeclass::bget>(_countof(fin), fin, fout, fbuf);
+		//rsbd8::radixsortcopy<&Testmeclass::bget>(_countof(fin), fin, fout);
 		// correctly fails to compile (not const-correct):
-		//rsbd8::radixsortcopynoalloc<&Testmeclass::zget>(_countof(fin), fin, fout, fbuf);
+		//rsbd8::radixsortcopy<&Testmeclass::zget>(_countof(fin), fin, fout);
 
 		Testmeclass *yin[_countof(cin)]{cin, cin + 1, cin + 2, cin + 3, cin + 4, cin + 5, cin + 6};
 		Testmeclass *yout[_countof(cin)];
-		Testmeclass *ybuf[_countof(cin)];
 
-		rsbd8::radixsortcopynoalloc<&Testmeclass::get>(_countof(yin), yin, yout, ybuf);
-		rsbd8::radixsortcopynoalloc<&Testmeclass::getwparam>(_countof(yin), yin, yout, ybuf, 8);
-		rsbd8::radixsortcopynoalloc<&Testmeclass::co>(_countof(yin), yin, yout, ybuf);
-		rsbd8::radixsortcopynoalloc<std::uint64_t, 9>(_countof(yin), yin, yout, ybuf);
+		rsbd8::radixsortcopy<&Testmeclass::get>(_countof(yin), yin, yout);
+		rsbd8::radixsortcopy<&Testmeclass::getwparam>(_countof(yin), yin, yout, 0, 8);
+		rsbd8::radixsortcopy<&Testmeclass::co>(_countof(yin), yin, yout);
+		rsbd8::radixsortcopy<std::uint64_t, 9>(_countof(yin), yin, yout);
 
-		rsbd8::radixsortcopynoalloc<&Testmeclass::sget>(_countof(yin), yin, yout, ybuf);
-		rsbd8::radixsortcopynoalloc<&Testmeclass::sco>(_countof(yin), yin, yout, ybuf);
-		rsbd8::radixsortcopynoalloc<std::int64_t, 17>(_countof(yin), yin, yout, ybuf);
+		rsbd8::radixsortcopy<&Testmeclass::sget>(_countof(yin), yin, yout);
+		rsbd8::radixsortcopy<&Testmeclass::sco>(_countof(yin), yin, yout);
+		rsbd8::radixsortcopy<std::int64_t, 17>(_countof(yin), yin, yout);
 
 		// unlike the commented calls above, these work as intended:
-		rsbd8::radixsortcopynoalloc<&Testmeclass::bget>(_countof(yin), yin, yout, ybuf);
-		rsbd8::radixsortcopynoalloc<&Testmeclass::zget>(_countof(yin), yin, yout, ybuf);
+		rsbd8::radixsortcopy<&Testmeclass::bget>(_countof(yin), yin, yout);
+		rsbd8::radixsortcopy<&Testmeclass::zget>(_countof(yin), yin, yout);
 
 		// TODO: add more unit tests
 	}
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
 
-	// allocate RSBD8_TEST_BATCH_SIZE for the in- and outputs
-	assert(sizeof(void *) <= static_cast<std::size_t>(RSBD8_TEST_BATCH_SIZE));// RSBD8_TEST_BATCH_SIZE must be greater than or equal to sizeof(void *)
-	assert(static_cast<std::size_t>(PTRDIFF_MAX) >= static_cast<std::size_t>(RSBD8_TEST_BATCH_SIZE));// RSBD8_TEST_BATCH_SIZE must be less than or equal to PTRDIFF_MAX
+	// allocate batchmaximum for the in- and outputs
+	static std::size_t constexpr batchmaximum{*(std::max_element(RSBD8_TEST_BATCH_SIZE, RSBD8_TEST_BATCH_SIZE + _countof(RSBD8_TEST_BATCH_SIZE)))};
+	static_assert(sizeof(void *) <= batchmaximum);// batchmaximum must be greater than or equal to sizeof(void *)
+	static_assert(static_cast<std::size_t>(PTRDIFF_MAX) >= batchmaximum);// batchmaximum must be less than or equal to PTRDIFF_MAX
 	SIZE_T upLargePageSize{GetLargePageMinimum()};
 	upLargePageSize = !upLargePageSize? 4096 : upLargePageSize;// just set it to 4096 if the system doesn't support large pages
 	assert(!(upLargePageSize - 1 & upLargePageSize));// only one bit should be set in the value of upLargePageSize
 	std::size_t upLargePageSizem1{upLargePageSize - 1};
-	std::size_t upSizeIn{(upLargePageSizem1 & -static_cast<std::ptrdiff_t>(RSBD8_TEST_BATCH_SIZE)) + (RSBD8_TEST_BATCH_SIZE)};// round up to the nearest multiple of upLargePageSize
+	std::size_t upSizeIn{(upLargePageSizem1 & -static_cast<std::ptrdiff_t>(batchmaximum)) + batchmaximum};// round up to the nearest multiple of upLargePageSize
 	void *in{VirtualAlloc(nullptr, upSizeIn, MEM_LARGE_PAGES | MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)};
 	if(!in){
 		MessageBoxW(nullptr, L"out of memory failure", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 		return{0};// failure status
 	}
-	std::size_t upSizeOut{(upLargePageSizem1 & -static_cast<std::ptrdiff_t>((RSBD8_TEST_BATCH_SIZE) + (upLargePageSize >> 1))) + ((RSBD8_TEST_BATCH_SIZE) + (upLargePageSize >> 1))};// round up to the nearest multiple of upLargePageSize
+	std::size_t upSizeOut{(upLargePageSizem1 & -static_cast<std::ptrdiff_t>(batchmaximum + (upLargePageSize >> 1))) + (batchmaximum + (upLargePageSize >> 1))};// round up to the nearest multiple of upLargePageSize
 	void *oriout{VirtualAlloc(nullptr, upSizeOut, MEM_LARGE_PAGES | MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)};// add half a page
 	if(!oriout){
 		BOOL boVirtualFree{VirtualFree(in, 0, MEM_RELEASE)};
@@ -716,7 +732,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}};
 		std::future<void> fut[15];
 		std::uint32_t *pFIin{reinterpret_cast<std::uint32_t *>(in)};
-		if(std::size_t j{static_cast<std::size_t>(RSBD8_TEST_BATCH_SIZE) / (4 * 7)}){
+		if(std::size_t j{batchmaximum / (4 * 7)}){
 			if(16 <= j){// split over 16 threads
 				std::size_t part0{(j + 15) >> 4};// rounded up in the companion thread
 				fut[0] = std::async(std::launch::async, filllambda, part0, pFIin);// this can technically throw...
@@ -769,7 +785,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			pFIin += 7 * j;
 		}
 		// handle the remaining items in the main thread
-		if(std::size_t rem{static_cast<std::size_t>(RSBD8_TEST_BATCH_SIZE) % (4 * 7)}){
+		if(std::size_t rem{batchmaximum % (4 * 7)}){
 			std::uint32_t split{static_cast<std::uint32_t>(static_cast<unsigned>(std::rand()))};
 			static_assert(4 * 7 <= 32, L"remainder terms handled incorrectly, update this part of the code");
 			// discard float (and double as a consequence) infinity and NaN to not mess up std::sort() and std::stable_sort()
@@ -827,11 +843,20 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 
 	bool succeeded;// used to check for successful sorting, or repeat runs if needed
-/*
+	std::ptrdiff_t testloopcount{_countof(RSBD8_TEST_BATCH_SIZE) - 1};
+repeattest:
+	std::size_t currentbatchsize{RSBD8_TEST_BATCH_SIZE[testloopcount]};
+	WritePaddedu64(szTicksRu64Text, currentbatchsize);
+	*reinterpret_cast<std::uint64_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint64_t>(L'\n') << 32 | static_cast<std::uint64_t>(L'B') << 16 | static_cast<std::uint64_t>(L' ');// the last wchar_t is correctly set to zero here
+	OutputDebugStringW(L"running a test batch of\n");
+	OutputDebugStringW(szTicksRu64Text);
+
+/*#ifndef RSBD8_DISABLE_BENCHMARK_DIRECT
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -840,7 +865,179 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"encapsulated 80-bit unsigned rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}while(!succeeded);
+#ifdef _DEBUG
+	if(16 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const *>(out)};
+		auto curlo{*piter++};
+		do{
+			auto curhi{*piter++};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			curlo = curhi;
+		}while(--k);
+	}
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsortcopy(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"encapsulated 80-bit unsigned rsbd8::radixsortcopy() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}while(!succeeded);
+#ifdef _DEBUG
+	if(16 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const *>(out)};
+		auto curlo{*piter++};
+		do{
+			auto curhi{*piter++};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			curlo = curhi;
+		}while(--k);
+	}
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_SIGNED
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsort(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"encapsulated 80-bit signed rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}while(!succeeded);
+#ifdef _DEBUG
+	if(16 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> const *>(out)};
+		auto curlo{*piter++};
+		do{
+			auto curhi{*piter++};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			curlo = curhi;
+		}while(--k);
+	}
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsortcopy(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"encapsulated 80-bit signed rsbd8::radixsortcopy() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}while(!succeeded);
+#ifdef _DEBUG
+	if(16 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> const *>(out)};
+		auto curlo{*piter++};
+		do{
+			auto curhi{*piter++};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			curlo = curhi;
+		}while(--k);
+	}
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_SIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsort(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -857,8 +1054,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 16 - 1};// -1 for the intial bounds
+	if(16 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const *>(out)};
 		auto lo{*piter++};
 		auto curlo{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::longdoubletest128<false, true, true>>(lo)};
@@ -871,11 +1068,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -884,7 +1082,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -901,8 +1099,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 16 - 1};// -1 for the intial bounds
+	if(16 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const *>(out)};
 		auto lo{*piter++};
 		auto curlo{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::longdoubletest128<false, true, true>>(lo)};
@@ -915,12 +1113,16 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+*/
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 128-bit tests are only available on 64-bit and larger systems
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -929,7 +1131,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::test128<false, false, false> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, false, false> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -946,8 +1148,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 16 - 1};// -1 for the intial bounds
+	if(16 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::test128<false, false, false> const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -957,11 +1159,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -970,7 +1173,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::test128<false, false, false> const *>(in), reinterpret_cast<rsbd8::helper::test128<false, false, false> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, false, false> const *>(in), reinterpret_cast<rsbd8::helper::test128<false, false, false> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -987,8 +1190,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 16 - 1};// -1 for the intial bounds
+	if(16 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::test128<false, false, false> const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -998,11 +1201,14 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_SIGNED
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1011,7 +1217,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::test128<false, true, false> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, true, false> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1028,8 +1234,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 16 - 1};// -1 for the intial bounds
+	if(16 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::test128<false, true, false> const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -1039,11 +1245,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1052,7 +1259,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::test128<false, true, false> const *>(in), reinterpret_cast<rsbd8::helper::test128<false, true, false> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, true, false> const *>(in), reinterpret_cast<rsbd8::helper::test128<false, true, false> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1069,8 +1276,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 16 - 1};// -1 for the intial bounds
+	if(16 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::test128<false, true, false> const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -1080,11 +1287,14 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_SIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1093,7 +1303,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::test128<false, true, true> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, true, true> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1110,8 +1320,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 16 - 1};// -1 for the intial bounds
+	if(16 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(out)};
 		auto lo{*piter++};
 		auto curlo{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::test128<false, true, true>>(lo)};
@@ -1124,11 +1334,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1137,7 +1348,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(in), reinterpret_cast<rsbd8::helper::test128<false, true, true> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(in), reinterpret_cast<rsbd8::helper::test128<false, true, true> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1154,8 +1365,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 16 - 1};// -1 for the intial bounds
+	if(16 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(out)};
 		auto lo{*piter++};
 		auto curlo{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::test128<false, true, true>>(lo)};
@@ -1168,13 +1379,16 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#endif// 128-bit tests are only available on 64-bit and larger systems
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1183,7 +1397,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::sort(std::execution::par_unseq, reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
+		std::sort(std::execution::par_unseq, reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + currentbatchsize / 8);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1202,7 +1416,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1211,7 +1425,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + currentbatchsize / 8);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1227,12 +1441,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint64_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
-*/
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1241,7 +1454,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<std::uint64_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort(currentbatchsize / 8, reinterpret_cast<std::uint64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1258,8 +1471,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 8 - 1};// -1 for the intial bounds
+	if(8 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 8 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint64_t const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -1269,11 +1482,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1282,7 +1496,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<std::uint64_t const *>(in), reinterpret_cast<std::uint64_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy(currentbatchsize / 8, reinterpret_cast<std::uint64_t const *>(in), reinterpret_cast<std::uint64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1299,8 +1513,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 8 - 1};// -1 for the intial bounds
+	if(8 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 8 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint64_t const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -1310,13 +1524,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-/*
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_SIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1325,7 +1541,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::sort(std::execution::par_unseq, reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
+		std::sort(std::execution::par_unseq, reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + currentbatchsize / 8);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1344,7 +1560,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1353,7 +1569,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + currentbatchsize / 8);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1369,11 +1585,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int64_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1382,7 +1598,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<std::int64_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort(currentbatchsize / 8, reinterpret_cast<std::int64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1399,8 +1615,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 8 - 1};// -1 for the intial bounds
+	if(8 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 8 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::int64_t const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -1410,11 +1626,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1423,7 +1640,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<std::int64_t const *>(in), reinterpret_cast<std::int64_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy(currentbatchsize / 8, reinterpret_cast<std::int64_t const *>(in), reinterpret_cast<std::int64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1440,8 +1657,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 8 - 1};// -1 for the intial bounds
+	if(8 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 8 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::int64_t const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -1451,12 +1668,16 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_SIGNED
+/*
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1465,35 +1686,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::sort(std::execution::par_unseq, reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"double std::sort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}
-	{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + currentbatchsize / 8);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1509,11 +1702,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1522,7 +1715,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<double *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort(currentbatchsize / 8, reinterpret_cast<double *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1539,8 +1732,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 8 - 1};// -1 for the intial bounds
+	if(8 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 8 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint64_t const *>(out)};
 		auto lo{*piter++};
 		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint64_t>(lo)};
@@ -1553,11 +1746,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1566,7 +1760,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<double const *>(in), reinterpret_cast<double *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy(currentbatchsize / 8, reinterpret_cast<double const *>(in), reinterpret_cast<double *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1583,8 +1777,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 8 - 1};// -1 for the intial bounds
+	if(8 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 8 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint64_t const *>(out)};
 		auto lo{*piter++};
 		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint64_t>(lo)};
@@ -1597,12 +1791,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1611,7 +1808,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::sort(std::execution::par_unseq, reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
+		std::sort(std::execution::par_unseq, reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + currentbatchsize / 4);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1630,7 +1827,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1639,7 +1836,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + currentbatchsize / 4);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1655,11 +1852,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint32_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1668,7 +1865,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<std::uint32_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort(currentbatchsize / 4, reinterpret_cast<std::uint32_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1685,8 +1882,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 4 - 1};// -1 for the intial bounds
+	if(4 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 4 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint32_t const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -1696,11 +1893,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1709,7 +1907,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<std::uint32_t const *>(in), reinterpret_cast<std::uint32_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy(currentbatchsize / 4, reinterpret_cast<std::uint32_t const *>(in), reinterpret_cast<std::uint32_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1726,8 +1924,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 4 - 1};// -1 for the intial bounds
+	if(4 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 4 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint32_t const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -1737,12 +1935,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_SIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1751,7 +1952,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::sort(std::execution::par_unseq, reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
+		std::sort(std::execution::par_unseq, reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + currentbatchsize / 4);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1770,7 +1971,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1779,7 +1980,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + currentbatchsize / 4);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1795,11 +1996,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int32_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1808,7 +2009,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<std::int32_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort(currentbatchsize / 4, reinterpret_cast<std::int32_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1825,8 +2026,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 4 - 1};// -1 for the intial bounds
+	if(4 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 4 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::int32_t const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -1836,11 +2037,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1849,7 +2051,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<std::int32_t const *>(in), reinterpret_cast<std::int32_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy(currentbatchsize / 4, reinterpret_cast<std::int32_t const *>(in), reinterpret_cast<std::int32_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1866,8 +2068,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 4 - 1};// -1 for the intial bounds
+	if(4 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 4 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::int32_t const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -1877,12 +2079,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_SIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1891,35 +2096,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::sort(std::execution::par_unseq, reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"float std::sort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}
-	{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + currentbatchsize / 4);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1935,11 +2112,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1948,7 +2125,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<float *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort(currentbatchsize / 4, reinterpret_cast<float *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1965,8 +2142,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 4 - 1};// -1 for the intial bounds
+	if(4 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 4 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint32_t const *>(out)};
 		auto lo{*piter++};
 		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(lo)};
@@ -1979,11 +2156,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -1992,7 +2170,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<float const *>(in), reinterpret_cast<float *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy(currentbatchsize / 4, reinterpret_cast<float const *>(in), reinterpret_cast<float *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2009,8 +2187,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 4 - 1};// -1 for the intial bounds
+	if(4 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 4 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint32_t const *>(out)};
 		auto lo{*piter++};
 		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(lo)};
@@ -2023,12 +2201,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2037,7 +2218,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::sort(std::execution::par_unseq, reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
+		std::sort(std::execution::par_unseq, reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + currentbatchsize / 2);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2056,7 +2237,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2065,7 +2246,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + currentbatchsize / 2);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2081,11 +2262,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint16_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2094,7 +2275,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 2, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort(currentbatchsize / 2, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2111,8 +2292,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 2 - 1};// -1 for the intial bounds
+	if(2 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 2 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint16_t const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -2122,11 +2303,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2135,7 +2317,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 2, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy(currentbatchsize / 2, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2152,8 +2334,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 2 - 1};// -1 for the intial bounds
+	if(2 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 2 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint16_t const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -2163,12 +2345,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_SIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2177,7 +2362,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::sort(std::execution::par_unseq, reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
+		std::sort(std::execution::par_unseq, reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + currentbatchsize / 2);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2196,7 +2381,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2205,7 +2390,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + currentbatchsize / 2);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2221,11 +2406,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int16_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2234,7 +2419,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 2, reinterpret_cast<std::int16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort(currentbatchsize / 2, reinterpret_cast<std::int16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2251,8 +2436,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 2 - 1};// -1 for the intial bounds
+	if(2 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 2 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::int16_t const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -2262,11 +2447,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2275,7 +2461,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 2, reinterpret_cast<std::int16_t const *>(in), reinterpret_cast<std::int16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy(currentbatchsize / 2, reinterpret_cast<std::int16_t const *>(in), reinterpret_cast<std::int16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2292,8 +2478,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 2 - 1};// -1 for the intial bounds
+	if(2 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 2 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::int16_t const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -2303,11 +2489,14 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_SIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2316,7 +2505,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE) / 2, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(currentbatchsize / 2, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2333,8 +2522,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 2 - 1};// -1 for the intial bounds
+	if(2 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 2 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint16_t const *>(out)};
 		auto lo{*piter++};
 		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(lo)};
@@ -2347,11 +2536,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2360,7 +2550,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE) / 2, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(currentbatchsize / 2, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2377,8 +2567,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) / 2 - 1};// -1 for the intial bounds
+	if(2 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize / 2 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint16_t const *>(out)};
 		auto lo{*piter++};
 		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(lo)};
@@ -2391,12 +2581,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2405,7 +2598,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::sort(std::execution::par_unseq, reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE));
+		std::sort(std::execution::par_unseq, reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + currentbatchsize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2424,7 +2617,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2433,7 +2626,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE));
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + currentbatchsize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2449,11 +2642,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint8_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2462,7 +2655,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort(currentbatchsize, reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2479,8 +2672,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) - 1};// -1 for the intial bounds
+	if(1 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint8_t const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -2490,11 +2683,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2503,7 +2697,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE), reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy(currentbatchsize, reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2520,8 +2714,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) - 1};// -1 for the intial bounds
+	if(1 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint8_t const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -2531,12 +2725,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_SIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2545,7 +2742,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::sort(std::execution::par_unseq, reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE));
+		std::sort(std::execution::par_unseq, reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + currentbatchsize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2564,7 +2761,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2573,7 +2770,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE));
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + currentbatchsize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2589,11 +2786,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int8_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2602,7 +2799,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE), reinterpret_cast<std::int8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort(currentbatchsize, reinterpret_cast<std::int8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2619,8 +2816,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) - 1};// -1 for the intial bounds
+	if(1 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::int8_t const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -2630,11 +2827,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2643,7 +2841,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE), reinterpret_cast<std::int8_t const *>(in), reinterpret_cast<std::int8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy(currentbatchsize, reinterpret_cast<std::int8_t const *>(in), reinterpret_cast<std::int8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2660,8 +2858,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) - 1};// -1 for the intial bounds
+	if(1 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::int8_t const *>(out)};
 		auto curlo{*piter++};
 		do{
@@ -2671,11 +2869,14 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_SIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2684,7 +2885,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(currentbatchsize, reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2701,8 +2902,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) - 1};// -1 for the intial bounds
+	if(1 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint8_t const *>(out)};
 		auto lo{*piter++};
 		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(lo)};
@@ -2715,11 +2916,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
 
 		// start measuring
 		{
@@ -2728,7 +2930,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE), reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(currentbatchsize, reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2745,8 +2947,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t k{(RSBD8_TEST_BATCH_SIZE) - 1};// -1 for the intial bounds
+	if(1 * 2 <= currentbatchsize){// verify if sorted
+		std::size_t k{currentbatchsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint8_t const *>(out)};
 		auto lo{*piter++};
 		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(lo)};
@@ -2759,17 +2961,78 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+//#endif// not RSBD8_DISABLE_BENCHMARK_DIRECT
+#ifndef RSBD8_DISABLE_BENCHMARK_INDIRECT
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		rsbd8::helper::longdoubletest128<false, false, false> const *pSource{reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const *>(in)};
+		rsbd8::helper::longdoubletest128<false, false, false> const **pDest{reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const **>(out)};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::longdoubletest128<false, false, false>), sizeof(void *))};
+		std::size_t i{testsize};
+		while(i){
+			*pDest++ = pSource++;
+			--i;
+		}
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> **>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"encapsulated 80-bit unsigned, indirect rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}while(!succeeded);
+#ifdef _DEBUG
+	if(std::max(sizeof(rsbd8::helper::longdoubletest128<false, false, false>), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
+		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::longdoubletest128<false, false, false>), sizeof(void *))};
+		std::size_t k{testsize - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const *const *>(out)};
+		auto lo{*piter++};
+		auto curlo{*lo};
+		do{
+			auto hi{*piter++};
+			auto curhi{*hi};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
+			// shift up by one
+			lo = hi;
+			curlo = curhi;
+		}while(--k);
+	}
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		rsbd8::helper::longdoubletest128<false, true, true> const *pSource{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const *>(in)};
 		rsbd8::helper::longdoubletest128<false, true, true> const **pDest{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(rsbd8::helper::longdoubletest128<false, true, true>), sizeof(void *))};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::longdoubletest128<false, true, true>), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -2795,8 +3058,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(rsbd8::helper::longdoubletest128<false, true, true>), sizeof(void *))};
+	if(std::max(sizeof(rsbd8::helper::longdoubletest128<false, true, true>), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
+		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::longdoubletest128<false, true, true>), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const *const *>(out)};
 		auto lo{*piter++};
@@ -2811,18 +3074,21 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 128-bit tests are only available on 64-bit and larger systems
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		rsbd8::helper::test128<false, true, true> const *pSource{reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(in)};
-		rsbd8::helper::test128<false, true, true> const **pDest{reinterpret_cast<rsbd8::helper::test128<false, true, true> const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *))};
+		rsbd8::helper::test128<false, false, false> const *pSource{reinterpret_cast<rsbd8::helper::test128<false, false, false> const *>(in)};
+		rsbd8::helper::test128<false, false, false> const **pDest{reinterpret_cast<rsbd8::helper::test128<false, false, false> const **>(out)};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::test128<false, false, false>), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -2848,8 +3114,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *))};
+	if(std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
+		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::test128<false, false, false> const *const *>(out)};
 		auto lo{*piter++};
@@ -2864,17 +3130,20 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		rsbd8::helper::test128<false, true, true> const *pSource{reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(in)};
 		rsbd8::helper::test128<false, true, true> const **pDest{reinterpret_cast<rsbd8::helper::test128<false, true, true> const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *))};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -2900,8 +3169,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *))};
+	if(std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
+		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::test128<false, true, true> const *const *>(out)};
 		auto lo{*piter++};
@@ -2916,19 +3185,22 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#endif// 128-bit tests are only available on 64-bit and larger systems
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
 		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint64_t), sizeof(void *))};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint64_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -2954,17 +3226,18 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint64_t, indirect std::stable_sort() test\n"	);
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
 		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint64_t), sizeof(void *))};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint64_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -2990,8 +3263,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint64_t), sizeof(void *))};
+	if(std::max(sizeof(std::uint64_t), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint64_t), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint64_t const *const *>(out)};
 		auto lo{*piter++};
@@ -3006,18 +3279,21 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
 		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint64_t), sizeof(void *))};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint64_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3043,17 +3319,18 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double, indirect std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
 		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint64_t), sizeof(void *))};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint64_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3079,8 +3356,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint64_t), sizeof(void *))};
+	if(std::max(sizeof(std::uint64_t), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint64_t), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint64_t const *const *>(out)};
 		auto lo{*piter++};
@@ -3095,18 +3372,21 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
 		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint32_t), sizeof(void *))};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint32_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3132,17 +3412,18 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint32_t, indirect std::stable_sort() test\n"	);
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
 		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint32_t), sizeof(void *))};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint32_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3168,8 +3449,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint32_t), sizeof(void *))};
+	if(std::max(sizeof(std::uint32_t), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint32_t), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint32_t const *const *>(out)};
 		auto lo{*piter++};
@@ -3184,18 +3465,21 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
 		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint32_t), sizeof(void *))};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint32_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3221,17 +3505,18 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float, indirect std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
 		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint32_t), sizeof(void *))};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint32_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3257,8 +3542,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint32_t), sizeof(void *))};
+	if(std::max(sizeof(std::uint32_t), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint32_t), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint32_t const *const *>(out)};
 		auto lo{*piter++};
@@ -3273,18 +3558,21 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		std::uint16_t const *pSource{reinterpret_cast<std::uint16_t const *>(in)};
 		std::uint16_t const **pDest{reinterpret_cast<std::uint16_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint16_t), sizeof(void *))};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint16_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3310,17 +3598,18 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint16_t, indirect std::stable_sort() test\n"	);
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		std::uint16_t const *pSource{reinterpret_cast<std::uint16_t const *>(in)};
 		std::uint16_t const **pDest{reinterpret_cast<std::uint16_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint16_t), sizeof(void *))};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint16_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3346,8 +3635,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint16_t), sizeof(void *))};
+	if(std::max(sizeof(std::uint16_t), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint16_t), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint16_t const *const *>(out)};
 		auto lo{*piter++};
@@ -3362,17 +3651,20 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		std::uint16_t const *pSource{reinterpret_cast<std::uint16_t const *>(in)};
 		std::uint16_t const **pDest{reinterpret_cast<std::uint16_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint16_t), sizeof(void *))};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint16_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3398,8 +3690,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint16_t), sizeof(void *))};
+	if(std::max(sizeof(std::uint16_t), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint16_t), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint16_t const *const *>(out)};
 		auto lo{*piter++};
@@ -3414,18 +3706,21 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		std::uint8_t const *pSource{reinterpret_cast<std::uint8_t const *>(in)};
 		std::uint8_t const **pDest{reinterpret_cast<std::uint8_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *))};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint8_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3451,17 +3746,18 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint8_t, indirect std::stable_sort() test\n"	);
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		std::uint8_t const *pSource{reinterpret_cast<std::uint8_t const *>(in)};
 		std::uint8_t const **pDest{reinterpret_cast<std::uint8_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *))};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint8_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3487,8 +3783,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *))};
+	if(std::max(sizeof(std::uint8_t), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint8_t), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint8_t const *const *>(out)};
 		auto lo{*piter++};
@@ -3503,17 +3799,20 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		std::uint8_t const *pSource{reinterpret_cast<std::uint8_t const *>(in)};
 		std::uint8_t const **pDest{reinterpret_cast<std::uint8_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *))};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint8_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3539,8 +3838,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *))};
+	if(std::max(sizeof(std::uint8_t), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
+		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint8_t), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint8_t const *const *>(out)};
 		auto lo{*piter++};
@@ -3555,13 +3854,16 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#endif// not RSBD8_DISABLE_BENCHMARK_INDIRECT
+*/
 	// benchmark finished time
 	WritePaddedu64(szTicksRu64Text, PerfCounter100ns());
 	*reinterpret_cast<std::uint64_t UNALIGNED*>(szTicksRu64Text + 20) = static_cast<std::uint64_t>(L'\n') << 32 | static_cast<std::uint64_t>(L'b') << 16 | static_cast<std::uint64_t>(L' ');// the last wchar_t is correctly set to zero here
 	// output debug strings to the system
 	OutputDebugStringW(szTicksRu64Text);
+	if(0 <= --testloopcount) goto repeattest;// this loop was a later addition, so the goto is just used for simplicity, as the code is already structured in a way that allows this without any issues
 
 	BOOL boVirtualFreeIn{VirtualFree(in, 0, MEM_RELEASE)};
 	static_cast<void>(boVirtualFreeIn);
@@ -3570,6 +3872,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	static_cast<void>(boVirtualFreeOut);
 	assert(boVirtualFreeOut);
 
+#ifndef RSBD8_DISABLE_BENCHMARK_WINDOW
 	// perform application initialization
 	WNDCLASSEXW wcex;
 	wcex.cbSize = sizeof WNDCLASSEXW;
@@ -3643,5 +3946,5 @@ GetFirstMessage:
 		assert(boUnregisterClassW);
 	}else MessageBoxW(nullptr, L"RegisterClassExW() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 	return{0};// failure status
-*/
+#endif// not RSBD8_DISABLE_BENCHMARK_WINDOW
 }
