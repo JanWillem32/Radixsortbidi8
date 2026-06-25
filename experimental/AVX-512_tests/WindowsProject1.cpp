@@ -7,6 +7,7 @@
 // WindowsProject1.cpp : Defines the entry point for the application.
 #include "pch.h"
 #include <Aclapi.h>
+#include <tlhelp32.h>
 #include <cmath>
 
 // This test suite and the library header allows some configuration with macros.
@@ -355,7 +356,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	OutputDebugStringW(szTicksRu64Text);
 
 	{
-		// Set time critical process and thread priority and single-processor operating mode.
+		// Set realtime process and later on time critical thread priority.
 		// Set the security descriptor to allow changing the process information.
 		// Note: NtCurrentProcess()/ZwCurrentProcess(), NtCurrentThread()/ZwCurrentThread() and NtCurrentSession()/ZwCurrentSession() resolve to macros defined to HANDLE (void *) values of (sign-extended) -1, -2 and -3 respectively in Wdm.h. Due to being hard-coded in user- and kernel-mode drivers like this, these values are pretty certain to never change on this platform.
 		DWORD dr{SetSecurityInfo(reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1)), SE_KERNEL_OBJECT, PROCESS_SET_LIMITED_INFORMATION | THREAD_SET_LIMITED_INFORMATION, nullptr, nullptr, nullptr, nullptr)};
@@ -368,19 +369,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			MessageBoxW(nullptr, L"SetPriorityClass() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 			return{0};// failure status
 		}
-		BOOL boSetThreadPriority{SetThreadPriority(reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-2)), THREAD_PRIORITY_TIME_CRITICAL)};
-		if(!boSetThreadPriority){
-			MessageBoxW(nullptr, L"SetThreadPriority() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
-			return{0};// failure status
-		}
 
 		// Enable the permissions to use large pages for VirtualAlloc().
-		HANDLE hToken;
-		BOOL boOpenProcessToken{OpenProcessToken(reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1)), TOKEN_ADJUST_PRIVILEGES, &hToken)};
-		if(!boOpenProcessToken){
-			MessageBoxW(nullptr, L"OpenProcessToken() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
-			return{0};// failure status
-		}
 		// Fill in the struct for AdjustTokenPrivileges().
 		struct TOKEN_PRIVILEGES_1UNIT{DWORD PrivilegeCount; LUID_AND_ATTRIBUTES Privilege[1];}Info;
 		Info.PrivilegeCount = 1;
@@ -389,6 +379,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		BOOL boLookupPrivilegeValueW{LookupPrivilegeValueW(nullptr, SE_LOCK_MEMORY_NAME, &Info.Privilege[0].Luid)};
 		if(!boLookupPrivilegeValueW){
 			MessageBoxW(nullptr, L"LookupPrivilegeValueW() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
+			return{0};// failure status
+		}
+		HANDLE hToken;
+		BOOL boOpenProcessToken{OpenProcessToken(reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1)), TOKEN_ADJUST_PRIVILEGES, &hToken)};
+		if(!boOpenProcessToken){
+			MessageBoxW(nullptr, L"OpenProcessToken() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 			return{0};// failure status
 		}
 		// Adjust the lock memory privilege.
@@ -689,10 +685,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		std::srand(static_cast<unsigned>(u64start));// prepare a seed for rand()
 	}
-	{
-		// filled initialization of the input part (only done once)
+	{// filled initialization of the input part (only done once)
 		static_assert(RAND_MAX == 0x7FFF, L"RAND_MAX changed from 0x7FFF (15 bits of data), update this part of the code");
-		auto filllambda{[](std::size_t i, std::uint32_t *pFIin)noexcept{// the work is currently split over 16 threads
+		auto filllambda{[](std::size_t i, std::uint32_t *pFIin)noexcept{
 			do{
 				std::uint32_t split{static_cast<std::uint32_t>(static_cast<unsigned>(std::rand()))};// 15 bits of data, one bit wasted
 				// discard float (and double as a consequence) infinity and NaN to not mess up std::sort() and std::stable_sort()
@@ -735,62 +730,27 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			}while(--i);
 			return;
 		}};
-		std::future<void> fut[15];
+		std::vector<std::future<void>> futvec;
 		std::uint32_t *pFIin{reinterpret_cast<std::uint32_t *>(in)};
-		if(std::size_t j{batchmaximum / (4 * 7)}){
-			if(16 <= j){// split over 16 threads
-				std::size_t part0{(j + 15) >> 4};// rounded up in the companion thread
-				fut[0] = std::async(std::launch::async, filllambda, part0, pFIin);// this can technically throw...
-				pFIin += 7 * part0;
-				std::size_t part1{(j + 14) >> 4};// rounded up in the companion thread
-				fut[1] = std::async(std::launch::async, filllambda, part1, pFIin);// this can technically throw...
-				pFIin += 7 * part1;
-				std::size_t part2{(j + 13) >> 4};// rounded up in the companion thread
-				fut[2] = std::async(std::launch::async, filllambda, part2, pFIin);// this can technically throw...
-				pFIin += 7 * part2;
-				std::size_t part3{(j + 12) >> 4};// rounded up in the companion thread
-				fut[3] = std::async(std::launch::async, filllambda, part3, pFIin);// this can technically throw...
-				pFIin += 7 * part3;
-				std::size_t part4{(j + 11) >> 4};// rounded up in the companion thread
-				fut[4] = std::async(std::launch::async, filllambda, part4, pFIin);// this can technically throw...
-				pFIin += 7 * part4;
-				std::size_t part5{(j + 10) >> 4};// rounded up in the companion thread
-				fut[5] = std::async(std::launch::async, filllambda, part5, pFIin);// this can technically throw...
-				pFIin += 7 * part5;
-				std::size_t part6{(j + 9) >> 4};// rounded up in the companion thread
-				fut[6] = std::async(std::launch::async, filllambda, part6, pFIin);// this can technically throw...
-				pFIin += 7 * part6;
-				std::size_t part7{(j + 8) >> 4};// rounded up in the companion thread
-				fut[7] = std::async(std::launch::async, filllambda, part7, pFIin);// this can technically throw...
-				pFIin += 7 * part7;
-				std::size_t part8{(j + 7) >> 4};// rounded up in the companion thread
-				fut[8] = std::async(std::launch::async, filllambda, part8, pFIin);// this can technically throw...
-				pFIin += 7 * part8;
-				std::size_t part9{(j + 6) >> 4};// rounded up in the companion thread
-				fut[9] = std::async(std::launch::async, filllambda, part9, pFIin);// this can technically throw...
-				pFIin += 7 * part9;
-				std::size_t part10{(j + 5) >> 4};// rounded up in the companion thread
-				fut[10] = std::async(std::launch::async, filllambda, part10, pFIin);// this can technically throw...
-				pFIin += 7 * part10;
-				std::size_t part11{(j + 4) >> 4};// rounded up in the companion thread
-				fut[11] = std::async(std::launch::async, filllambda, part11, pFIin);// this can technically throw...
-				pFIin += 7 * part11;
-				std::size_t part12{(j + 3) >> 4};// rounded up in the companion thread
-				fut[12] = std::async(std::launch::async, filllambda, part12, pFIin);// this can technically throw...
-				pFIin += 7 * part12;
-				std::size_t part13{(j + 2) >> 4};// rounded up in the companion thread
-				fut[13] = std::async(std::launch::async, filllambda, part13, pFIin);// this can technically throw...
-				pFIin += 7 * part13;
-				std::size_t part14{(j + 1) >> 4};// rounded up in the companion thread
-				fut[14] = std::async(std::launch::async, filllambda, part14, pFIin);// this can technically throw...
-				pFIin += 7 * part14;
-				j >>= 4;// rounded down in the main thread
+		std::size_t rem{batchmaximum % (4u * 7u)};
+		if(std::size_t j{batchmaximum / (4u * 7u)}){
+			unsigned allowedthreads{std::thread::hardware_concurrency()};
+			if(allowedthreads <= j){
+				unsigned i{allowedthreads - 1u};// the main thread will handle the last part
+				futvec.reserve(i);// this can technically throw...
+				do{// i will decrement by one each iteration, excluding zero, impacting the distribution here
+					std::size_t part{(j + i) / allowedthreads};// rounded up in the companion thread
+					assert(part);
+					futvec.emplace_back(std::async(std::launch::async, filllambda, part, pFIin));// this can technically throw...
+					pFIin += 7u * part;
+				}while(--i);
+				j /= allowedthreads;// rounded down in the main thread
 			}
 			filllambda(j, pFIin);// handle the last part in the main thread
-			pFIin += 7 * j;
+			pFIin += 7u * j;
 		}
 		// handle the remaining items in the main thread
-		if(std::size_t rem{batchmaximum % (4 * 7)}){
+		if(rem){
 			std::uint32_t split{static_cast<std::uint32_t>(static_cast<unsigned>(std::rand()))};
 			static_assert(4 * 7 <= 32, L"remainder terms handled incorrectly, update this part of the code");
 			// discard float (and double as a consequence) infinity and NaN to not mess up std::sort() and std::stable_sort()
@@ -845,6 +805,44 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 				*reinterpret_cast<std::uint8_t *>(pFIin) = static_cast<std::uint8_t>(static_cast<unsigned>(std::rand()));
 			}
 		}
+	}
+
+	{// Set time critical process thread priority after warming up the thread pool.
+		// Take a snapshot of all running threads in the system.
+		HANDLE hThreadSnap{CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)};
+		if(INVALID_HANDLE_VALUE == hThreadSnap){
+			MessageBoxW(nullptr, L"CreateToolhelp32Snapshot() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
+			return{0};// failure status
+		}
+		THREADENTRY32 te32;
+		te32.dwSize = sizeof(THREADENTRY32);// fill in the size of the structure before using it
+		if(!Thread32First(hThreadSnap, &te32)){// Retrieve information about the first thread
+			MessageBoxW(nullptr, L"Thread32First() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
+			BOOL boCloseHandleSnap{CloseHandle(hThreadSnap)};// cleanup
+			static_cast<void>(boCloseHandleSnap);
+			assert(boCloseHandleSnap);
+			return{0};// failure status
+		}
+		DWORD dwOwnerPID{GetProcessId(reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1)))};
+		assert(dwOwnerPID);
+		do if(te32.th32OwnerProcessID == dwOwnerPID){// only set the priority of the threads that belong to this process
+			HANDLE hThread{OpenThread(THREAD_SET_LIMITED_INFORMATION, FALSE, te32.th32ThreadID)};
+			// Raise the priority of the main and all thread pool threads to time critical.
+			BOOL boSetThreadPriority{SetThreadPriority(hThread, THREAD_PRIORITY_TIME_CRITICAL)};
+			BOOL boCloseHandle{CloseHandle(hThread)};// cleanup
+			static_cast<void>(boCloseHandle);
+			assert(boCloseHandle);
+			if(!boSetThreadPriority){
+				MessageBoxW(nullptr, L"SetThreadPriority() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
+				BOOL boCloseHandleSnap{CloseHandle(hThreadSnap)};// cleanup
+				static_cast<void>(boCloseHandleSnap);
+				assert(boCloseHandleSnap);
+				return{0};// failure status
+			}
+		}while(Thread32Next(hThreadSnap, &te32));
+		BOOL boCloseHandleSnap{CloseHandle(hThreadSnap)};// cleanup
+		static_cast<void>(boCloseHandleSnap);
+		assert(boCloseHandleSnap);
 	}
 
 	bool succeeded;// used to check for successful sorting, or repeat runs if needed

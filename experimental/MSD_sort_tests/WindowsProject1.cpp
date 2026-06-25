@@ -783,7 +783,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	OutputDebugStringW(szTicksRu64Text);
 
 	{
-		// Set time critical process and thread priority and single-processor operating mode.
+		// Set realtime process and later on time critical thread priority.
 		// Set the security descriptor to allow changing the process information.
 		// Note: NtCurrentProcess()/ZwCurrentProcess(), NtCurrentThread()/ZwCurrentThread() and NtCurrentSession()/ZwCurrentSession() resolve to macros defined to HANDLE (void *) values of (sign-extended) -1, -2 and -3 respectively in Wdm.h. Due to being hard-coded in user- and kernel-mode drivers like this, these values are pretty certain to never change on this platform.
 		DWORD dr{SetSecurityInfo(reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1)), SE_KERNEL_OBJECT, PROCESS_SET_LIMITED_INFORMATION | THREAD_SET_LIMITED_INFORMATION, nullptr, nullptr, nullptr, nullptr)};
@@ -796,19 +796,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			MessageBoxW(nullptr, L"SetPriorityClass() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 			return{0};// failure status
 		}
-		BOOL boSetThreadPriority{SetThreadPriority(reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-2)), THREAD_PRIORITY_TIME_CRITICAL)};
-		if(!boSetThreadPriority){
-			MessageBoxW(nullptr, L"SetThreadPriority() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
-			return{0};// failure status
-		}
 
 		// Enable the permissions to use large pages for VirtualAlloc().
-		HANDLE hToken;
-		BOOL boOpenProcessToken{OpenProcessToken(reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1)), TOKEN_ADJUST_PRIVILEGES, &hToken)};
-		if(!boOpenProcessToken){
-			MessageBoxW(nullptr, L"OpenProcessToken() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
-			return{0};// failure status
-		}
 		// Fill in the struct for AdjustTokenPrivileges().
 		struct TOKEN_PRIVILEGES_1UNIT{DWORD PrivilegeCount; LUID_AND_ATTRIBUTES Privilege[1];}Info;
 		Info.PrivilegeCount = 1;
@@ -817,6 +806,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		BOOL boLookupPrivilegeValueW{LookupPrivilegeValueW(nullptr, SE_LOCK_MEMORY_NAME, &Info.Privilege[0].Luid)};
 		if(!boLookupPrivilegeValueW){
 			MessageBoxW(nullptr, L"LookupPrivilegeValueW() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
+			return{0};// failure status
+		}
+		HANDLE hToken;
+		BOOL boOpenProcessToken{OpenProcessToken(reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1)), TOKEN_ADJUST_PRIVILEGES, &hToken)};
+		if(!boOpenProcessToken){
+			MessageBoxW(nullptr, L"OpenProcessToken() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 			return{0};// failure status
 		}
 		// Adjust the lock memory privilege.
@@ -1150,6 +1145,44 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 				*reinterpret_cast<std::uint8_t *>(pFIin) = static_cast<std::uint8_t>(fill);
 			}
 		}
+	}
+
+	{// Set time critical process thread priority after warming up the thread pool.
+		// Take a snapshot of all running threads in the system.
+		HANDLE hThreadSnap{CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)};
+		if(INVALID_HANDLE_VALUE == hThreadSnap){
+			MessageBoxW(nullptr, L"CreateToolhelp32Snapshot() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
+			return{0};// failure status
+		}
+		THREADENTRY32 te32;
+		te32.dwSize = sizeof(THREADENTRY32);// fill in the size of the structure before using it
+		if(!Thread32First(hThreadSnap, &te32)){// Retrieve information about the first thread
+			MessageBoxW(nullptr, L"Thread32First() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
+			BOOL boCloseHandleSnap{CloseHandle(hThreadSnap)};// cleanup
+			static_cast<void>(boCloseHandleSnap);
+			assert(boCloseHandleSnap);
+			return{0};// failure status
+		}
+		DWORD dwOwnerPID{GetProcessId(reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1)))};
+		assert(dwOwnerPID);
+		do if(te32.th32OwnerProcessID == dwOwnerPID){// only set the priority of the threads that belong to this process
+			HANDLE hThread{OpenThread(THREAD_SET_LIMITED_INFORMATION, FALSE, te32.th32ThreadID)};
+			// Raise the priority of the main and all thread pool threads to time critical.
+			BOOL boSetThreadPriority{SetThreadPriority(hThread, THREAD_PRIORITY_TIME_CRITICAL)};
+			BOOL boCloseHandle{CloseHandle(hThread)};// cleanup
+			static_cast<void>(boCloseHandle);
+			assert(boCloseHandle);
+			if(!boSetThreadPriority){
+				MessageBoxW(nullptr, L"SetThreadPriority() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
+				BOOL boCloseHandleSnap{CloseHandle(hThreadSnap)};// cleanup
+				static_cast<void>(boCloseHandleSnap);
+				assert(boCloseHandleSnap);
+				return{0};// failure status
+			}
+		}while(Thread32Next(hThreadSnap, &te32));
+		BOOL boCloseHandleSnap{CloseHandle(hThreadSnap)};// cleanup
+		static_cast<void>(boCloseHandleSnap);
+		assert(boCloseHandleSnap);
 	}
 
 	bool succeeded;// used to check for successful sorting, or repeat runs if needed
