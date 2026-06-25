@@ -662,7 +662,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// Set time critical process and thread priority and single-processor operating mode.
 		// Set the security descriptor to allow changing the process information.
 		// Note: NtCurrentProcess()/ZwCurrentProcess(), NtCurrentThread()/ZwCurrentThread() and NtCurrentSession()/ZwCurrentSession() resolve to macros defined to HANDLE (void *) values of (sign-extended) -1, -2 and -3 respectively in Wdm.h. Due to being hard-coded in user- and kernel-mode drivers like this, these values are pretty certain to never change on this platform.
-		DWORD dr{SetSecurityInfo(reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1)), SE_KERNEL_OBJECT, PROCESS_SET_INFORMATION, nullptr, nullptr, nullptr, nullptr)};
+		DWORD dr{SetSecurityInfo(reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1)), SE_KERNEL_OBJECT, PROCESS_SET_LIMITED_INFORMATION | THREAD_SET_LIMITED_INFORMATION, nullptr, nullptr, nullptr, nullptr)};
 		if(ERROR_SUCCESS != dr){
 			MessageBoxW(nullptr, L"SetSecurityInfo() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 			return{0};// failure status
@@ -670,6 +670,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		BOOL boSetPriorityClass{SetPriorityClass(reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1)), REALTIME_PRIORITY_CLASS)};
 		if(!boSetPriorityClass){
 			MessageBoxW(nullptr, L"SetPriorityClass() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
+			return{0};// failure status
+		}
+		BOOL boSetThreadPriority{SetThreadPriority(reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-2)), THREAD_PRIORITY_TIME_CRITICAL)};
+		if(!boSetThreadPriority){
+			MessageBoxW(nullptr, L"SetThreadPriority() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 			return{0};// failure status
 		}
 
