@@ -3200,43 +3200,43 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 // These are used for the multi-threaded loop initialisation, and are designed to be used in a way that allows the main thread to handle slice 0, and the supporting threads to handle slices 1 and above, with the ability to expand the main thread's slice range if threads failed to spawn.
 // In essence, these functions determine the slice size and location for each thread.
 // The version for the main thread is different from the general version.
-// It starts at slice 0, but allows expansion to higher slices as a range from 0 to unsigned unassignedslice if threads failed to spawn.
+// It starts at slice 0, but allows expansion to higher slices as a range from 0 to unsigned unassignedslices if threads failed to spawn.
 // It also has a std::ptrdiff_t i item count return, which is to be iterated down to zero inclusive.
 // The general version has a std::size_t i item count return, which is to be iterated down to zero exclusive, and can only handle one slice at a time.
 // If a std::size_t loc pointer offset is returned, it is to be added to the array start/end pointer(s) for the loops.
 // The initmtsliceswaps* versions are for reversing loops only, and require an even itemsperloop parameter.
 
 template<unsigned itemsperloop>
-RSBD8_NODISCARD RSBD8_FUNC_INLINE std::ptrdiff_t initmtslicemain(std::size_t count, unsigned allowedthreads, unsigned unassignedslice)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::ptrdiff_t initmtslicemain(std::size_t count, unsigned allowedthreads, unsigned unassignedslices)noexcept{
 	// version for the main thread only, for non-reversing loops
 	static_assert(itemsperloop, "itemsperloop must not be zero");
 	assert(allowedthreads);
 	assert(1u < count);
 	// the item count is rounded down in the lower set of threads, and rounded up in the upper set of threads
 	// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-	std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count + 1u)};
+	std::size_t i{count + 1u};
 	if constexpr(1u < itemsperloop){
-		std::ptrdiff_t rem{static_cast<std::ptrdiff_t>(static_cast<std::size_t>(i) % itemsperloop)};
-		i = static_cast<std::ptrdiff_t>(static_cast<std::size_t>(i) / itemsperloop);
-		unsigned slicerem{static_cast<unsigned>(static_cast<std::size_t>(i) % allowedthreads)};
-		i = static_cast<std::ptrdiff_t>(static_cast<std::size_t>(i) / allowedthreads);
+		std::size_t rem{i % itemsperloop};
+		i /= itemsperloop;
+		unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
+		i /= allowedthreads;
 		unsigned slicesother{allowedthreads >> 1};
 		if(slicerem < slicesother) slicerem = slicesother;
-		i += i * unassignedslice;// unassignedslice will usually be zero at this point
+		i += i * unassignedslices;// unassignedslices will usually be zero at this point
 		slicerem -= slicesother;
-		i += std::min(slicerem, unassignedslice);// only add on the remainder terms for this half
-		i = i * static_cast<std::ptrdiff_t>(itemsperloop) + rem - 1;// include the final remainder term for outside of the loop in the next part
+		i += std::min(slicerem, unassignedslices);// only add on the remainder terms for this half
+		i = i * itemsperloop + rem;// include the final remainder term for outside of the loop in the next part
 	}else{// single item per loop
-		unsigned slicerem{static_cast<unsigned>(static_cast<std::size_t>(i) % allowedthreads)};
-		i = static_cast<std::ptrdiff_t>(static_cast<std::size_t>(i) / allowedthreads);
+		unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
+		i /= allowedthreads;
 		unsigned slicesother{allowedthreads >> 1};
 		if(slicerem < slicesother) slicerem = slicesother;
-		i += i * unassignedslice;// unassignedslice will usually be zero at this point
+		i += i * unassignedslices;// unassignedslices will usually be zero at this point
 		slicerem -= slicesother;
-		i += std::min(slicerem, unassignedslice);// only add on the remainder terms for this half
-		--i;
+		i += std::min(slicerem, unassignedslices);// only add on the remainder terms for this half
 	}
-	return{i};
+	--i;
+	return{static_cast<std::ptrdiff_t>(i)};
 }
 
 template<unsigned itemsperloop>
@@ -3277,7 +3277,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtslic
 }
 
 template<unsigned itemsperloop>
-RSBD8_NODISCARD RSBD8_FUNC_INLINE std::size_t initmtsliceswapsmain(std::size_t count, unsigned allowedthreads, unsigned unassignedslice)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::size_t initmtsliceswapsmain(std::size_t count, unsigned allowedthreads, unsigned unassignedslices)noexcept{
 	// version for the main thread only, for reversing loops
 	static_assert(itemsperloop, "itemsperloop must not be zero");
 	static_assert(!(1u & itemsperloop), "itemsperloop must be even for reversing loops");
@@ -3294,9 +3294,9 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::size_t initmtsliceswapsmain(std::size_t c
 	loc += rem;// include the final remainder term for outside of the loop in the next part
 	unsigned slicesother{allowedthreads >> 1};
 	if(slicerem < slicesother) slicerem = slicesother;
-	i += i * unassignedslice;// unassignedslice will usually be zero at this point
+	i += i * unassignedslices;// unassignedslices will usually be zero at this point
 	slicerem -= slicesother;
-	i += std::min(slicerem, unassignedslice);// only add on the remainder terms for this half
+	i += std::min(slicerem, unassignedslices);// only add on the remainder terms for this half
 	loc += i * (itemsperloop >> 1);
 	return{loc};
 }
@@ -31735,40 +31735,31 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 					ze2 = _mm512_maskz_ternarylogic_epi64(eq2, ze2, ze2, ze2, 0xFF);
 					ze3 = _mm512_maskz_ternarylogic_epi64(eq3, ze3, ze3, ze3, 0xFF);
-					// shrink to just use byte shuffles, with an output in reverse order
-					__m128i xe0{_mm512_cvtsepi64_epi8(ze0)};
-					__m128i xe1{_mm512_cvtsepi64_epi8(ze1)};
+					ze0 = _mm512_maskz_permutexvar_epi32(0b11010100'11010100, _mm512_setr_epi32(0, 0, 2 * 6, 0, 2 * 5, 0, 2 * 4, 2 * 7, 0, 0, 2 * 2, 0, 2 * 1, 0, 2 * 0, 2 * 3), ze0);
+					ze1 = _mm512_maskz_permutexvar_epi32(0b01010000'01010000, _mm512_setr_epi32(0, 0, 0, 0, 2 * 3, 0, 2 * 2, 0, 0, 0, 0, 0, 2 * 1, 0, 2 * 0, 0), ze1);
 
-					__m128i xe2{_mm512_cvtsepi64_epi8(ze2)};
-					__m128i xe3{_mm512_cvtsepi64_epi8(ze3)};
-					__m128i xc0{_mm_shuffle_epi8(xe0, _mm_setr_epi8(-128, -128, 6, -128, 5, -128, 4, 7, -128, -128, 2, -128, 1, -128, 0, 3))};
-					__m128i xc1{_mm_shuffle_epi8(xe1, _mm_setr_epi8(-128, -128, -128, -128, 3, -128, 2, -128, -128, -128, -128, -128, 1, -128, 0, -128))};
+					ze2 = _mm512_maskz_permutexvar_epi32(0b11111111'00000000, _mm512_setr_epi32(0, 0, 0, 0, 0, 0, 0, 0, 2 * 3, 2 * 5, 2 * 2, 2 * 4, 2 * 1, 2 * 7, 2 * 0, 2 * 6), ze2);
+					ze3 = _mm512_maskz_permutexvar_epi32(0b11111111'00000000, _mm512_setr_epi32(0, 0, 0, 0, 0, 0, 0, 0, 2 * 2, 2 * 5, 2 * 1, 2 * 4, 2 * 0, 2 * 7, 2 * 3, 2 * 6), ze3);
+					ze0 = _mm512_add_epi32(ze0, ze1);
 
-					__m128i xc2{_mm_shuffle_epi8(xe2, _mm_setr_epi8(-128, -128, -128, -128, -128, -128, -128, -128, 3, 5, 2, 4, 1, 7, 0, 6))};
-					__m128i xc3{_mm_shuffle_epi8(xe3, _mm_setr_epi8(-128, -128, -128, -128, -128, -128, -128, -128, 2, 5, 1, 4, 0, 7, 3, 6))};
-					xc0 = _mm_add_epi8(xc0, xc1);
-
-					xc2 = _mm_add_epi8(xc2, xc3);
+					ze2 = _mm512_add_epi32(ze2, ze3);
 					zcur = _mm512_shuffle_i64x2(zcur, zcur, _MM_PERM_ABCD);// reverse the order of the input, part 1
-
-					xc0 = _mm_add_epi8(xc0, xc2);
 					zout = _mm512_shuffle_i64x2(zout, zout, _MM_PERM_ABCD);// reverse the order of the input, part 1
-					__m512i zall{_mm512_undefined_epi32()};
 
-					__m128i xshift{_mm_slli_epi16(xc0, 8)};
-					xc0 = _mm_srai_epi16(xc0, 8);
-
-					xshift = _mm_srai_epi16(xshift, 8);
+					ze0 = _mm512_add_epi32(ze0, ze2);
+					zcur = _mm512_permutex_epi64(zcur, _MM_PERM_CDAB);// reverse the order of the input, part 2
 					zabcdefgh = _mm512_shuffle_i64x2(zabcdefgh, zabcdefgh, _MM_PERM_ABCD);// reverse the order of the input, part 1
 
-					xc0 = _mm_add_epi16(xc0, xshift);
-					zcur = _mm512_permutex_epi64(zcur, _MM_PERM_CDAB);// reverse the order of the input, part 2
+					__m512i zshift{_mm512_srai_epi64(ze0, 32)};
+					ze0 = _mm512_shuffle_epi32(ze0, _MM_SHUFFLE(2, 2, 0, 0));
+					__m512i zall{_mm512_undefined_epi32()};
 
-					__m512i zcomb{_mm512_cvtepi16_epi64(xc0)};
+					zcur = _mm512_add_epi64(zcur, zshift);
+					ze0 = _mm512_srai_epi64(ze0, 32);
 					zout = _mm512_permutex_epi64(zout, _MM_PERM_CDAB);// reverse the order of the input, part 2
-					zall = _mm512_ternarylogic_epi64(zall, zall, zall, 0xFF);
 
-					zcur = _mm512_add_epi64(zcur, zcomb);
+					zcur = _mm512_add_epi64(zcur, ze0);
+					zall = _mm512_ternarylogic_epi64(zall, zall, zall, 0xFF);
 					zabcdefgh = _mm512_permutex_epi64(zabcdefgh, _MM_PERM_CDAB);// reverse the order of the input, part 2
 
 					_mm512_i64scatter_epi64(pdst, zcur, zout, 8);// store the values
@@ -31971,35 +31962,26 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 						ze2 = _mm512_maskz_ternarylogic_epi64(eq2, ze2, ze2, ze2, 0xFF);
 						ze3 = _mm512_maskz_ternarylogic_epi64(eq3, ze3, ze3, ze3, 0xFF);
-						// shrink to just use byte shuffles
-						__m128i xe0{_mm512_cvtsepi64_epi8(ze0)};
-						__m128i xe1{_mm512_cvtsepi64_epi8(ze1)};
+						ze0 = _mm512_maskz_permutexvar_epi32(0b11010100'11010100, _mm512_setr_epi32(0, 0, 2 * 0, 0, 2 * 1, 0, 2 * 2, 2 * 3, 0, 0, 2 * 4, 0, 2 * 5, 0, 2 * 6, 2 * 7), ze0);
+						ze1 = _mm512_maskz_permutexvar_epi32(0b01010000'01010000, _mm512_setr_epi32(0, 0, 0, 0, 2 * 0, 0, 2 * 1, 0, 0, 0, 0, 0, 2 * 2, 0, 2 * 3, 0), ze1);
 
-						__m128i xe2{_mm512_cvtsepi64_epi8(ze2)};
-						__m128i xe3{_mm512_cvtsepi64_epi8(ze3)};
-						__m128i xc0{_mm_shuffle_epi8(xe0, _mm_setr_epi8(-128, -128, 0, -128, 1, -128, 2, 3, -128, -128, 4, -128, 5, -128, 6, 7))};
-						__m128i xc1{_mm_shuffle_epi8(xe1, _mm_setr_epi8(-128, -128, -128, -128, 0, -128, 1, -128, -128, -128, -128, -128, 2, -128, 3, -128))};
+						ze2 = _mm512_maskz_permutexvar_epi32(0b11111111'00000000, _mm512_setr_epi32(0, 0, 0, 0, 0, 0, 0, 0, 2 * 3, 2 * 4, 2 * 0, 2 * 5, 2 * 1, 2 * 6, 2 * 2, 2 * 7), ze2);
+						ze3 = _mm512_maskz_permutexvar_epi32(0b11111111'00000000, _mm512_setr_epi32(0, 0, 0, 0, 0, 0, 0, 0, 2 * 3, 2 * 7, 2 * 0, 2 * 4, 2 * 1, 2 * 5, 2 * 2, 2 * 6), ze3);
+						ze0 = _mm512_add_epi32(ze0, ze1);
 
-						__m128i xc2{_mm_shuffle_epi8(xe2, _mm_setr_epi8(-128, -128, -128, -128, -128, -128, -128, -128, 3, 4, 0, 5, 1, 6, 2, 7))};
-						__m128i xc3{_mm_shuffle_epi8(xe3, _mm_setr_epi8(-128, -128, -128, -128, -128, -128, -128, -128, 3, 7, 0, 4, 1, 5, 2, 6))};
-						xc0 = _mm_add_epi8(xc0, xc1);
+						ze2 = _mm512_add_epi32(ze2, ze3);
 
-						xc2 = _mm_add_epi8(xc2, xc3);
-
-						xc0 = _mm_add_epi8(xc0, xc2);
+						ze0 = _mm512_add_epi32(ze0, ze2);
 						__m512i zall{_mm512_undefined_epi32()};
 
-						__m128i xshift{_mm_slli_epi16(xc0, 8)};
-						xc0 = _mm_srai_epi16(xc0, 8);
+						__m512i zshift{_mm512_srai_epi64(ze0, 32)};
+						ze0 = _mm512_shuffle_epi32(ze0, _MM_SHUFFLE(2, 2, 0, 0));
 
-						xshift = _mm_srai_epi16(xshift, 8);
+						zcur = _mm512_sub_epi64(zcur, zshift);
+						ze0 = _mm512_srai_epi64(ze0, 32);
 
-						xc0 = _mm_add_epi16(xc0, xshift);
+						zcur = _mm512_sub_epi64(zcur, ze0);
 						zall = _mm512_ternarylogic_epi64(zall, zall, zall, 0xFF);
-
-						__m512i zcomb{_mm512_cvtepi16_epi64(xc0)};
-
-						zcur = _mm512_sub_epi64(zcur, zcomb);
 
 						_mm512_i64scatter_epi64(pdst, zcur, zout, 8);// store the values
 						zcur = _mm512_sub_epi64(zcur, zall);

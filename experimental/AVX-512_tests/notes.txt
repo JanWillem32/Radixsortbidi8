@@ -1,35 +1,35 @@
 New version:
-On 2026-06-24 the trial with an x64 AVX-512 test version ended unsuccesfully again. It succeeded in the sorting tests, but even with a new set of optimisations it remained 18.5% slower than the conventional version, and performed even worse on sizes smaller than the main one of 8 GiB. Its reliance on still rather slow gather and scatter operations, and a lot of shuffles to offset the issues with hard to vectorise sequences in the code just do not offer much of a chance to optimise the code this way.
+On 2026-06-26 the trial with an x64 AVX-512 test version ended unsuccesfully again. It succeeded in the sorting tests, but even with a new set of optimisations it remained 10.5% slower than the conventional version, and performed even worse on sizes smaller than the main one of 6 GiB. Its reliance on still rather slow gather and scatter operations, and a lot of shuffles to offset the issues with hard to vectorise sequences in the code just do not offer much of a chance to optimise the code this way.
 
-(27115810832 + 27560080580) / (23033479912 + 23122526182) = 1.185
+(18117870386 + 19707722997) / (17091123224 + 17152608880) = 1.105
 
 The log from the AVX-512 version, no thread limitations, with 64-bit indices:
-00000046	41.62237930	[20924] std::uint64_t std::sort() test
-00000047	41.62248993	[20924]          43147598327
-00000048	65.85203552	[20924] std::uint64_t std::stable_sort() test
-00000049	65.85211182	[20924]          82886313350
-00000050	74.22847748	[20924] std::uint64_t rsbd8::radixsort() test
-00000051	74.22853851	[20924]          27115810832
-00000052	86.78487396	[20924] std::int64_t std::sort() test
-00000053	86.78491211	[20924]          41828721051
-00000054	110.74072266	[20924] std::int64_t std::stable_sort() test
-00000055	110.74081421	[20924]          81920943028
-00000056	119.19644165	[20924] std::int64_t rsbd8::radixsort() test
-00000057	119.19654083	[20924]          27560080580
+00000008	27.36342430	[19024] std::uint64_t std::sort() test
+00000009	27.36345291	[19024]          33141684727
+00000010	45.79485703	[19024] std::uint64_t std::stable_sort() test
+00000011	45.79495621	[19024]          62987183819
+00000012	51.41986847	[19024] std::uint64_t rsbd8::radixsort() test
+00000013	51.41995621	[19024]          18117870386
+00000014	60.97226715	[19024] std::int64_t std::sort() test
+00000015	60.97232056	[19024]          31421134442
+00000016	78.95179749	[19024] std::int64_t std::stable_sort() test
+00000017	78.95186615	[19024]          61406567468
+00000018	85.04850006	[19024] std::int64_t rsbd8::radixsort() test
+00000019	85.04862213	[19024]          19707722997
 
 The log from the conventional version, no thread limitations, with 64-bit indices:
-00000046	38.40982819	[9652] std::uint64_t std::sort() test
-00000047	38.41196823	[9652]          45221143567
-00000048	62.38067245	[9652] std::uint64_t std::stable_sort() test
-00000049	62.38074875	[9652]          82008982624
-00000050	69.55213928	[9652] std::uint64_t rsbd8::radixsort() test
-00000051	69.55227661	[9652]          23033479912
-00000052	81.98949432	[9652] std::int64_t std::sort() test
-00000053	81.98956299	[9652]          41445167117
-00000054	106.31044006	[9652] std::int64_t std::stable_sort() test
-00000055	106.31050873	[9652]          83204589418
-00000056	113.53936768	[9652] std::int64_t rsbd8::radixsort() test
-00000057	113.53945923	[9652]          23122526182
+00000008	27.13827896	[16016] std::uint64_t std::sort() test
+00000009	27.13829994	[16016]          32953417639
+00000010	45.32761002	[16016] std::uint64_t std::stable_sort() test
+00000011	45.32769775	[16016]          62160177648
+00000012	50.66677475	[16016] std::uint64_t rsbd8::radixsort() test
+00000013	50.66686249	[16016]          17091123224
+00000014	60.44541931	[16016] std::int64_t std::sort() test
+00000015	60.44543839	[16016]          32182558453
+00000016	78.65756226	[16016] std::int64_t std::stable_sort() test
+00000017	78.65768433	[16016]          62212374135
+00000018	84.15193939	[16016] std::int64_t rsbd8::radixsort() test
+00000019	84.15203857	[16016]          17152608880
 
 
 Old version:
