@@ -3200,43 +3200,43 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 // These are used for the multi-threaded loop initialisation, and are designed to be used in a way that allows the main thread to handle slice 0, and the supporting threads to handle slices 1 and above, with the ability to expand the main thread's slice range if threads failed to spawn.
 // In essence, these functions determine the slice size and location for each thread.
 // The version for the main thread is different from the general version.
-// It starts at slice 0, but allows expansion to higher slices as a range from 0 to unsigned unassignedslice if threads failed to spawn.
+// It starts at slice 0, but allows expansion to higher slices as a range from 0 to unsigned unassignedslices if threads failed to spawn.
 // It also has a std::ptrdiff_t i item count return, which is to be iterated down to zero inclusive.
 // The general version has a std::size_t i item count return, which is to be iterated down to zero exclusive, and can only handle one slice at a time.
 // If a std::size_t loc pointer offset is returned, it is to be added to the array start/end pointer(s) for the loops.
 // The initmtsliceswaps* versions are for reversing loops only, and require an even itemsperloop parameter.
 
 template<unsigned itemsperloop>
-RSBD8_NODISCARD RSBD8_FUNC_INLINE std::ptrdiff_t initmtslicemain(std::size_t count, unsigned allowedthreads, unsigned unassignedslice)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::ptrdiff_t initmtslicemain(std::size_t count, unsigned allowedthreads, unsigned unassignedslices)noexcept{
 	// version for the main thread only, for non-reversing loops
 	static_assert(itemsperloop, "itemsperloop must not be zero");
 	assert(allowedthreads);
 	assert(1u < count);
 	// the item count is rounded down in the lower set of threads, and rounded up in the upper set of threads
 	// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-	std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count + 1u)};
+	std::size_t i{count + 1u};
 	if constexpr(1u < itemsperloop){
-		std::ptrdiff_t rem{static_cast<std::ptrdiff_t>(static_cast<std::size_t>(i) % itemsperloop)};
-		i = static_cast<std::ptrdiff_t>(static_cast<std::size_t>(i) / itemsperloop);
-		unsigned slicerem{static_cast<unsigned>(static_cast<std::size_t>(i) % allowedthreads)};
-		i = static_cast<std::ptrdiff_t>(static_cast<std::size_t>(i) / allowedthreads);
+		std::size_t rem{i % itemsperloop};
+		i /= itemsperloop;
+		unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
+		i /= allowedthreads;
 		unsigned slicesother{allowedthreads >> 1};
 		if(slicerem < slicesother) slicerem = slicesother;
-		i += i * unassignedslice;// unassignedslice will usually be zero at this point
+		i += i * unassignedslices;// unassignedslices will usually be zero at this point
 		slicerem -= slicesother;
-		i += std::min(slicerem, unassignedslice);// only add on the remainder terms for this half
-		i = i * static_cast<std::ptrdiff_t>(itemsperloop) + rem - 1;// include the final remainder term for outside of the loop in the next part
+		i += std::min(slicerem, unassignedslices);// only add on the remainder terms for this half
+		i = i * itemsperloop + rem;// include the final remainder term for outside of the loop in the next part
 	}else{// single item per loop
-		unsigned slicerem{static_cast<unsigned>(static_cast<std::size_t>(i) % allowedthreads)};
-		i = static_cast<std::ptrdiff_t>(static_cast<std::size_t>(i) / allowedthreads);
+		unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
+		i /= allowedthreads;
 		unsigned slicesother{allowedthreads >> 1};
 		if(slicerem < slicesother) slicerem = slicesother;
-		i += i * unassignedslice;// unassignedslice will usually be zero at this point
+		i += i * unassignedslices;// unassignedslices will usually be zero at this point
 		slicerem -= slicesother;
-		i += std::min(slicerem, unassignedslice);// only add on the remainder terms for this half
-		--i;
+		i += std::min(slicerem, unassignedslices);// only add on the remainder terms for this half
 	}
-	return{i};
+	--i;
+	return{static_cast<std::ptrdiff_t>(i)};
 }
 
 template<unsigned itemsperloop>
@@ -3277,7 +3277,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtslic
 }
 
 template<unsigned itemsperloop>
-RSBD8_NODISCARD RSBD8_FUNC_INLINE std::size_t initmtsliceswapsmain(std::size_t count, unsigned allowedthreads, unsigned unassignedslice)noexcept{
+RSBD8_NODISCARD RSBD8_FUNC_INLINE std::size_t initmtsliceswapsmain(std::size_t count, unsigned allowedthreads, unsigned unassignedslices)noexcept{
 	// version for the main thread only, for reversing loops
 	static_assert(itemsperloop, "itemsperloop must not be zero");
 	static_assert(!(1u & itemsperloop), "itemsperloop must be even for reversing loops");
@@ -3294,9 +3294,9 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::size_t initmtsliceswapsmain(std::size_t c
 	loc += rem;// include the final remainder term for outside of the loop in the next part
 	unsigned slicesother{allowedthreads >> 1};
 	if(slicerem < slicesother) slicerem = slicesother;
-	i += i * unassignedslice;// unassignedslice will usually be zero at this point
+	i += i * unassignedslices;// unassignedslices will usually be zero at this point
 	slicerem -= slicesother;
-	i += std::min(slicerem, unassignedslice);// only add on the remainder terms for this half
+	i += std::min(slicerem, unassignedslices);// only add on the remainder terms for this half
 	loc += i * (itemsperloop >> 1);
 	return{loc};
 }
