@@ -86,14 +86,16 @@ See "Performance tests" for more details about array sizes, types and achievable
 - Library finalisation
 
 ## Examples of using the 4 templates with simple arrays as input (automatically deduced template parameters are omitted here):
-The rsbd8::radixsort() and rsbd8::radixsortcopy() template wrapper functions (typically) merely allocate memory prior to using the actual sorting functions.
-No intermediate buffer array is required when any variant of rsbd8::radixsortcopynoalloc() is used for sorting 8-bit types.
+The rsbd8::radixsort() and rsbd8::radixsortcopy() template wrapper functions (typically) merely allocate memory and determine the number of threads to use prior to entering the actual sorting functions.
+No intermediate buffer array is required when any variant of rsbd8::radixsortcopynoalloc() is used for sorting 8-bit types, as it uses a bucket sort approach.
 
 ```C++
 bool succeeded{rsbd8::radixsort(count, inputarr, pagesizeoptional)};
 bool succeeded{rsbd8::radixsortcopy(count, inputarr, outputarr, pagesizeoptional)};
-rsbd8::radixsortnoalloc(count, inputarr, bufferarr, false);
-rsbd8::radixsortcopynoalloc(count, inputarr, outputarr, bufferarr);
+rsbd8::radixsortnoalloc(count, allowedthreads, pfuturesplaceholder, pzeroedindices, inputarr, bufferarr, movetobuffer)// multithreaded mode
+rsbd8::radixsortcopynoalloc(count, allowedthreads, pfuturesplaceholder, pzeroedindices, inputarr, outputarr, bufferarr);// multithreaded mode
+rsbd8::radixsortnoalloc(count, pzeroedindices, inputarr, bufferarr, movetobuffer)// exclusive single-threaded mode for the entire library
+rsbd8::radixsortcopynoalloc(count, pzeroedindices, inputarr, outputarr, bufferarr);// exclusive single-threaded mode for the entire library
 ```
 
 ## Examples of using the 4 templates with input from first-level indirection (automatically deduced template parameters are omitted here):
@@ -104,9 +106,12 @@ These index parameters are typically used in a more straightforward manner and u
 The variant with a getter function allows any number of extra arguments to pass on to the getter function.
 Using a getter function that can throw (meaning that it lacks "noexcept") will incur some extra processing overhead.
 Multithreading can be limited at compile-time by setting the macro RSBD8_THREAD_MAXIMUM to 1, 2, 4, 6, 8 or 16 simultaneous threads.
-There is no multithreading limit by default, but when multithreading is enabled, std::thread will be queried once per call to get the default available processor core count to the process.
-Limits for multithreading based on the input count can be disabled at compile-time by setting the macro RSBD8_THREAD_MINIMUM to force using at least 2, 4, 6, 8 or 16 simultaneous threads.
-This is again not enabled by default, and it only applies when processor cores are available at runtime. The much lower limits for allowing 2-way multithreading at runtime always apply.
+The exclusive single-threaded mode for the entire library is enabled by setting the macro RSBD8_THREAD_MAXIMUM to 1.
+There is no multithreading limit by default, but when multithreading is enabled, rsbd8::radixsort() and rsbd8::radixsortcopy() will query std::thread::hardware_concurrency() to set up that limit.
+This library does not automatically cross a NUMA node boundary, and it is up to the user to set up the environment for that if desired.
+This library does have merging functions to make processing across NUMA nodes feasible, but it is not implemented in the main sorting functions.
+Limits for multithreading based on the input count can be partially disabled at compile-time by setting the macro RSBD8_THREAD_MINIMUM to force using at least 2, 4, 6, 8 or 16 simultaneous threads.
+This is again not enabled by default. The much lower limits for allowing multithreading at runtime at the the absolute minimum input count for the implemented multithreading functions always apply.
 
 ```C++
 bool succeeded{rsbd8::radixsort<&myclass::getterfunc>(count, inputarr, pagesizeoptional)};
@@ -116,14 +121,6 @@ bool succeeded{rsbd8::radixsort<std::uint64_t, addressoffset>(count, inputarr, p
 bool succeeded{rsbd8::radixsortcopy<&myclass::getterfunc>(count, inputarr, outputarr, pagesizeoptional, getterparameters...)};
 bool succeeded{rsbd8::radixsortcopy<&myclass::member>(count, inputarr, outputarr, pagesizeoptional)};
 bool succeeded{rsbd8::radixsortcopy<bool, addressoffset>(count, inputarr, outputarr, pagesizeoptional)};
-
-rsbd8::radixsortnoalloc<&myclass::getterfunc>(count, inputarr, bufferarr, false, getterparameters...);
-rsbd8::radixsortnoalloc<&myclass::member>(count, inputarr, bufferarr, false);
-rsbd8::radixsortnoalloc<std::int16_t, addressoffset>(count, inputarr, bufferarr, false);
-
-rsbd8::radixsortcopynoalloc<&myclass::getterfunc>(count, inputarr, outputarr, bufferarr, getterparameters...);
-rsbd8::radixsortcopynoalloc<&myclass::member>(count, inputarr, outputarr, bufferarr);
-rsbd8::radixsortcopynoalloc<float, addressoffset>(count, inputarr, outputarr, bufferarr);
 ```
 
 ### There are only a few template functions that almost directly implement sorting with indirection here:
@@ -143,10 +140,8 @@ rsbd8::buffermemorywrapper
 ```
 
 ## Examples of using the 4 templates with input from second-level indirection (automatically deduced template parameters are omitted here):
-As the use case for these almost always involve multi-pass techniques, the user is advised to allocate the (reusable) buffers accordingly and avoid the use of radixsortcopy() and radixsort().
-The rsbd8::allocatearray() and rsbd8::deallocatearray() inline function templates are provided for handling an intermediate buffer.
-Again, no intermediate buffer is required when rsbd8::radixsortcopynoalloc() is used for sorting a single-part type.
-These will internally first retrieve a pointer to a "T" type array "T *myarray".
+These have options for using a getter function, a member object pointer, or using a pointer to an array of pointers to the actual data.
+These last two will internally first retrieve a pointer to a "T" type array "T *myarray".
 After that it's dereferenced at the origin (first set of examples) or indexed (second set of examples) as "myarray[indirectionindex]" to retrieve the value used for sorting.
 Again, all "addressoffset" variants as template inputs displace like on a flat "std::byte const *", so not as some sort of array indices.
 The "addressoffset1" item here displaces the pointer in the input array to get the secondary pointer.
@@ -155,58 +150,65 @@ The "addressoffset2" item here displaces the secondary pointer to get the (unfil
 ### Examples of using the 2 templates with no indexed second-level indirection:
 
 ```C++
-rsbd8::radixsortcopynoalloc<&myclass::getterfunc, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2>(count, inputarr, outputarr, bufferarr, getterparameters...);
-rsbd8::radixsortcopynoalloc<&myclass::member, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2>(count, inputarr, outputarr, bufferarr);
-rsbd8::radixsortcopynoalloc<long *, addressoffset1, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2>(count, inputarr, outputarr, bufferarr);
+bool succeeded{rsbd8::radixsortcopy<&myclass::getterfunc, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2>(count, inputarr, outputarr, pagesizeoptional, getterparameters...)};
+bool succeeded{rsbd8::radixsortcopy<&myclass::member, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2>(count, inputarr, outputarr, pagesizeoptional)};
+bool succeeded{rsbd8::radixsortcopy<long *, addressoffset1, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2>(count, inputarr, outputarr, pagesizeoptional)};
 
-rsbd8::radixsortnoalloc<&myclass::getterfunc, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2>(count, inputarr, bufferarr, false, getterparameters...);
-rsbd8::radixsortnoalloc<&myclass::member, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2>(count, inputarr, bufferarr, false);
-rsbd8::radixsortnoalloc<wchar_t *, addressoffset1, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2>(count, inputarr, bufferarr, false);
+bool succeeded{rsbd8::radixsort<&myclass::getterfunc, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2>(count, inputarr, pagesizeoptional, getterparameters...)};
+bool succeeded{rsbd8::radixsort<&myclass::member, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2>(count, inputarr, pagesizeoptional)};
+bool succeeded{rsbd8::radixsort<wchar_t *, addressoffset1, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2>(count, inputarr, pagesizeoptional)};
 ```
 
 ### Examples of using the 2 templates with indexed second-level indirection:
 
 ```C++
-rsbd8::radixsortcopynoalloc<&myclass::getterfunc, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex, getterparameters...);
-rsbd8::radixsortcopynoalloc<&myclass::member, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex);
-rsbd8::radixsortcopynoalloc<double *, addressoffset1, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex);
+bool succeeded{rsbd8::radixsortcopy<&myclass::getterfunc, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, outputarr, pagesizeoptional, indirectionindex, getterparameters...)};
+bool succeeded{rsbd8::radixsortcopy<&myclass::member, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, outputarr, pagesizeoptional, indirectionindex)};
+bool succeeded{rsbd8::radixsortcopy<double *, addressoffset1, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, outputarr, pagesizeoptional, indirectionindex)};
 
-rsbd8::radixsortnoalloc<&myclass::getterfunc, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex, getterparameters...);
-rsbd8::radixsortnoalloc<&myclass::member, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex);
-rsbd8::radixsortnoalloc<unsigned long *, addressoffset1, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex);
+bool succeeded{rsbd8::radixsort<&myclass::getterfunc, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, pagesizeoptional, indirectionindex, getterparameters...)};
+bool succeeded{rsbd8::radixsort<&myclass::member, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, pagesizeoptional, indirectionindex)};
+bool succeeded{rsbd8::radixsort<unsigned long *, addressoffset1, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, pagesizeoptional, indirectionindex)};
 ```
 
 ### Examples of using the 2 templates with indexed first- and second-level indirection:
+The variants with a getter function do not qualify for this. These can only optionally use second-level indirection.
 
 ```C++
-rsbd8::radixsortcopynoalloc<&myclass::member, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex1, indirectionindex2);
-rsbd8::radixsortcopynoalloc<long double *, addressoffset1, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex1, indirectionindex2);
+bool succeeded{rsbd8::radixsortcopy<&myclass::member, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, outputarr, pagesizeoptional, indirectionindex1, indirectionindex2)};
+bool succeeded{rsbd8::radixsortcopy<long double *, addressoffset1, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, outputarr, pagesizeoptional, indirectionindex1, indirectionindex2)};
 
-rsbd8::radixsortnoalloc<&myclass::member, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex1, indirectionindex2);
-rsbd8::radixsortnoalloc<short *, addressoffset1, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex1, indirectionindex2);
+bool succeeded{rsbd8::radixsort<&myclass::member, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, pagesizeoptional, indirectionindex1, indirectionindex2)};
+bool succeeded{rsbd8::radixsort<short *, addressoffset1, rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::native, addressoffset2, true>(count, inputarr, pagesizeoptional, indirectionindex1, indirectionindex2)};
 ```
 
 ## The 4 main sorting template functions that are implemented here
 ### radixsortnoalloc():
 - counted (first parameter "count", the end of arrays are no inputs to these functions unlike some sorting functions)
-- sorts an array (second parameter "input")
-- uses an array as a buffer of the same size and type (third parameter "buffer")
-- with a toggle to output to either the input array or the buffer array (optional fourth parameter "movetobuffer")
+- limits to a set number of threads (second parameter "allowedthreads", unless multithreading is disabled)
+- uses a memory buffer of (allowedthreads - 1) * sizeof(std::future<void>) with natural alignment to store the multithreading futures (third parameter "pfuturesplaceholder", unless multithreading is disabled)
+- uses a memory buffer with cache line alignment to store the zeroed index counts, see rsbd8::allocatearray() for more information (fourth parameter "pzeroedindices")
+- sorts an array (fifth parameter "inputarr")
+- uses an array as a buffer of the same size and type (sixth parameter "bufferarr")
+- with a toggle to output to either the input array or the buffer array (optional seventh parameter "movetobuffer")
 - the array that is not selected for output contains garbage afterwards (typically the leftovers from an intermediate sorting stage)
 - both arrays need to be writable, but when using indirection the members can be const-qualified
 ### radixsortcopynoalloc():
 - counted (first parameter "count")
-- similar to radixsortnoalloc(), but will not write to the input array, which can be const-qualified (second parameter "input")
-- uses a dedicated output array of the same size (third parameter "output")
-- uses a memory buffer of the same size, which contains garbage afterwards (fourth parameter)
+- limits to a set number of threads (second parameter "allowedthreads", unless multithreading is disabled)
+- uses a memory buffer of (allowedthreads - 1) * sizeof(std::future<void>) with natural alignment to store the multithreading futures (third parameter "pfuturesplaceholder", unless multithreading is disabled)
+- uses a memory buffer with cache line alignment to store the zeroed index counts, see rsbd8::allocatearray() for more information (fourth parameter "pzeroedindices")
+- similar to radixsortnoalloc(), but will not write to the input array, which can be const-qualified (fourth parameter "inputarr")
+- uses a dedicated output array of the same size and type (fifth parameter "outputarr")
+- uses an array as a buffer of the same size and type (sixth parameter "bufferarr")
 ### radixsort():
 - wrapper template for radixsortnoalloc()
-- only allocates memory for the buffer parameter
+- allocates memory for the temporary buffers and determines the amount of threads to use
 - (Windows-only) large page size for VirtualAlloc() can be used if enabled with the lock memory privilege for the application enabled (optional third parameter)
 - (POSIX implementing systems-only) flags for enabling pages with huge TLB functionality for mmap() can be used (optional third parameter)
 ### radixsortcopy():
 - wrapper template for radixsortcopynoalloc()
-- only allocates memory for the buffer parameter
+- allocates memory for the temporary buffers and determines the amount of threads to use
 - (Windows-only) large page size for VirtualAlloc() can be used if enabled with the lock memory privilege for the application enabled (optional third parameter)
 - (POSIX implementing systems-only) flags for enabling pages with huge TLB functionality for mmap() can be used (optional third parameter)
 
@@ -270,13 +272,13 @@ This last combination is very uncommon, but could be useful in some rare cases.
 ```C++
 myclass collA[]{{1, "first"}, {1, "second"}, {-5, "third"}, {2, "fourth"}};// list construct
 myclass *pcollA[]{collA, collA + 1, collA + 2, collA + 3};// list pointers
-rsbd8::radixsortnoalloc<&myclass::keyorder, rsbd8::sortingdirection::dscfwdorder>(4, pcollA, psomeunusedbuffer);
+bool succeeded{rsbd8::radixsort<&myclass::keyorder, rsbd8::sortingdirection::dscfwdorder>(4, pcollA)};
 ```
 Members of "pcollA" will then get sorted according to their value "keyorder", in reverse order, while keeping the same array order.
 Pointers will in this case point to: {2, "fourth"}, {1, "first"}, {1, "second"}, {-5, "third"}.
 That is different from fully reversing the order when using this line instead of the above:
 ```C++
-rsbd8::radixsortnoalloc<&myclass::keyorder, rsbd8::dscrevorder>(4, pcollA, psomeunusedbuffer);
+bool succeeded{rsbd8::radixsort<&myclass::keyorder, rsbd8::dscrevorder>(4, pcollA)};
 ```
 Pointers will in this case point to: {2, "fourth"}, {1, "second"}, {1, "first"}, {-5, "third"}.
 Notice the same reverse stable sorting here, but opposite placement when encountering the same value multiple times.
