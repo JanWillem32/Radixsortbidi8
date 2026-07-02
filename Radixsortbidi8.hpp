@@ -14566,7 +14566,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) + 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -14579,9 +14579,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
-	unsigned lowercarryoutbits{2u + paritybool};
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+	other -= paritybool;// this can remove possible carry-out before the next right shift
 	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
@@ -15051,9 +15050,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
-			unsigned lowercarryoutbits{2u * usemultithread + runstepsparitybool[1]};
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
 			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), 0u)};
@@ -15113,7 +15111,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) + 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -15126,9 +15124,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
-	unsigned lowercarryoutbits{2u + paritybool};
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+	other -= paritybool;// this can remove possible carry-out before the next right shift
 	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
@@ -15679,9 +15676,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
-			unsigned lowercarryoutbits{2u * usemultithread + runstepsparitybool[1]};
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
 			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), movetobuffer)};
@@ -17460,7 +17456,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) + 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -17473,9 +17469,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
-	unsigned lowercarryoutbits{2u + paritybool};
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+	other -= paritybool;// this can remove possible carry-out before the next right shift
 	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
@@ -18170,9 +18165,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
-			unsigned lowercarryoutbits{2u * usemultithread + runstepsparitybool[1]};
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
 			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), 0u)};
@@ -18240,7 +18234,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) + 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -18253,9 +18247,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
-	unsigned lowercarryoutbits{2u + paritybool};
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+	other -= paritybool;// this can remove possible carry-out before the next right shift
 	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
@@ -19043,9 +19036,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
-			unsigned lowercarryoutbits{2u * usemultithread + runstepsparitybool[1]};
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
 			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), movetobuffer)};
@@ -19879,7 +19871,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) + 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -19892,9 +19884,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
-	unsigned lowercarryoutbits{2u + paritybool};
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+	other -= paritybool;// this can remove possible carry-out before the next right shift
 	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
@@ -20334,9 +20325,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
-			unsigned lowercarryoutbits{2u * usemultithread + runstepsparitybool[1]};
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
 			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), 0u)};
@@ -20393,7 +20383,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) + 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -20406,9 +20396,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
-	unsigned lowercarryoutbits{2u + paritybool};
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+	other -= paritybool;// this can remove possible carry-out before the next right shift
 	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
@@ -20854,9 +20843,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
-			unsigned lowercarryoutbits{2u * usemultithread + runstepsparitybool[1]};
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
 			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), movetobuffer)};
@@ -22023,7 +22011,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) + 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -22036,9 +22024,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
-	unsigned lowercarryoutbits{2u + paritybool};
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+	other -= paritybool;// this can remove possible carry-out before the next right shift
 	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
@@ -22674,9 +22661,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
-			unsigned lowercarryoutbits{2u * usemultithread + runstepsparitybool[1]};
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
 			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), 0u)};
@@ -22740,7 +22726,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) + 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -22753,9 +22739,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
-	unsigned lowercarryoutbits{2u + paritybool};
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+	other -= paritybool;// this can remove possible carry-out before the next right shift
 	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
@@ -23389,9 +23374,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
-			unsigned lowercarryoutbits{2u * usemultithread + runstepsparitybool[1]};
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
 			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), movetobuffer)};
@@ -24503,7 +24487,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) + 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -24516,9 +24500,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
-	unsigned lowercarryoutbits{2u + paritybool};
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+	other -= paritybool;// this can remove possible carry-out before the next right shift
 	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
@@ -24984,9 +24967,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
-			unsigned lowercarryoutbits{2u * usemultithread + runstepsparitybool[1]};
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
 			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), 0u)};
@@ -25043,7 +25025,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) + 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -25056,9 +25038,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
-	unsigned lowercarryoutbits{2u + paritybool};
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+	other -= paritybool;// this can remove possible carry-out before the next right shift
 	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
@@ -25619,9 +25600,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
-			unsigned lowercarryoutbits{2u * usemultithread + runstepsparitybool[1]};
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
 			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), movetobuffer)};
@@ -27208,7 +27188,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) + 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -27221,9 +27201,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
-	unsigned lowercarryoutbits{2u + paritybool};
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+	other -= paritybool;// this can remove possible carry-out before the next right shift
 	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
@@ -27961,9 +27940,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
-			unsigned lowercarryoutbits{2u * usemultithread + runstepsparitybool[1]};
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
 			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), 0u)};
@@ -28030,7 +28008,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) + 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -28043,9 +28021,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
-	unsigned lowercarryoutbits{2u + paritybool};
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+	other -= paritybool;// this can remove possible carry-out before the next right shift
 	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
@@ -28889,9 +28866,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
-			unsigned lowercarryoutbits{2u * usemultithread + runstepsparitybool[1]};
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
 			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), movetobuffer)};
@@ -32026,7 +32002,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) + 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -32039,9 +32015,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
-	unsigned lowercarryoutbits{2u + paritybool};
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+	other -= paritybool;// this can remove possible carry-out before the next right shift
 	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
@@ -34018,9 +33993,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
-			unsigned lowercarryoutbits{2u * usemultithread + runstepsparitybool[1]};
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
 			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), 0u)};
@@ -34081,7 +34055,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) + 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -34094,9 +34068,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
-	unsigned lowercarryoutbits{2u + paritybool};
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+	other -= paritybool;// this can remove possible carry-out before the next right shift
 	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
@@ -36726,9 +36699,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
-			unsigned lowercarryoutbits{2u * usemultithread + runstepsparitybool[1]};
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
 			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), movetobuffer)};
@@ -40396,7 +40368,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) + 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -40409,9 +40381,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
-	unsigned lowercarryoutbits{2u + paritybool};
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+	other -= paritybool;// this can remove possible carry-out before the next right shift
 	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
@@ -43935,9 +43906,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
-			unsigned lowercarryoutbits{2u * usemultithread + runstepsparitybool[1]};
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
 			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), 0u)};
@@ -44005,7 +43975,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) + 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -44018,9 +43988,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
-	unsigned lowercarryoutbits{2u + paritybool};
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+	other -= paritybool;// this can remove possible carry-out before the next right shift
 	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
@@ -48262,9 +48231,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
-			unsigned lowercarryoutbits{2u * usemultithread + runstepsparitybool[1]};
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
 			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), movetobuffer)};
@@ -48999,10 +48967,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pzeroedindices[-1].data())};// isrevorder is set to false because it's useless when not using indirection
+	std::uintptr_t allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pzeroedindices[-1].data())};// isrevorder is set to false because it's useless when not using indirection
 
 	// barrier and allareidentical value exchange with the main thread
-	++allareidentical;// send over a 1 or a 2
+	allareidentical = ~allareidentical;// send over a -1 or a -2
 	std::uintptr_t other{atomiclightbarrier.fetch_add(allareidentical)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -49011,10 +48979,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}while(!other);
 	}
 	// only one of the two threads can set the all are identical state
-	allareidentical -= static_cast<unsigned>(other);// codes:
+	allareidentical += other;// codes for the meaning of allareidentical:
 	// 0: continue processing
-	// -1: input from the main thread
-	// 1: input from this thread
+	// 1: input from the main thread
+	// ~0: input from the companion thread
 
 	if(!allareidentical)RSBD8_LIKELY{
 		radixsortnoallocsinglesortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, input, output, pzeroedindices->data());
@@ -49302,7 +49270,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 
 		// transform counts into base offsets
-		unsigned allareidentical;
+		std::conditional_t<ismultithreadcapable, std::uintptr_t, unsigned> allareidentical;
 		if constexpr(ismultithreadcapable){// first barrier
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
@@ -49323,10 +49291,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(!other);
 			}
 			// only one of the two threads can set the all are identical state
-			allareidentical -= static_cast<unsigned>(other);// codes:
+			allareidentical += other;// codes for the meaning of allareidentical:
 			// 0: continue processing
-			// -1: input from the companion thread
-			// 1: input from this thread
+			// 1: input from the main thread
+			// ~0: input from the companion thread
 		}else{// single-threaded-only
 			allareidentical = generateoffsetssinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, offsets.data());
 		}
@@ -49572,10 +49540,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pzeroedindices[-1].data())};
+	std::uintptr_t allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pzeroedindices[-1].data())};
 
 	// barrier and allareidentical value exchange with the main thread
-	++allareidentical;// send over a 1 or a 2
+	allareidentical = ~allareidentical;// send over a -1 or a -2
 	std::uintptr_t other{atomiclightbarrier.fetch_add(allareidentical)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -49584,10 +49552,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}while(!other);
 	}
 	// only one of the two threads can set the all are identical state
-	allareidentical -= static_cast<unsigned>(other);// codes:
+	allareidentical += other;// codes for the meaning of allareidentical:
 	// 0: continue processing
-	// -1: input from the main thread
-	// 1: input from this thread
+	// 1: input from the main thread
+	// ~0: input from the companion thread
 
 	if(!allareidentical)RSBD8_LIKELY{
 		radixsortnoallocsinglesortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, buffer, input, pzeroedindices->data());
@@ -49875,7 +49843,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 
 		// transform counts into base offsets
-		unsigned allareidentical;
+		std::conditional_t<ismultithreadcapable, std::uintptr_t, unsigned> allareidentical;
 		if constexpr(ismultithreadcapable){// first barrier
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
@@ -49896,10 +49864,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(!other);
 			}
 			// only one of the two threads can set the all are identical state
-			allareidentical -= static_cast<unsigned>(other);// codes:
+			allareidentical += other;// codes for the meaning of allareidentical:
 			// 0: continue processing
-			// -1: input from the companion thread
-			// 1: input from this thread
+			// 1: input from the main thread
+			// ~0: input from the companion thread
 		}else{// single-threaded-only
 			allareidentical = generateoffsetssinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, offsets.data());
 		}
@@ -50632,11 +50600,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pzeroedindices[-1].data())};
+	std::uintptr_t allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pzeroedindices[-1].data())};
 
 	// barrier and allareidentical value exchange with the main thread
 	// no exception detection required here
-	++allareidentical;// send over a 1 or a 2
+	allareidentical = ~allareidentical;// send over a -1 or a -2
 	std::uintptr_t other{atomiclightbarrier.fetch_add(allareidentical)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -50645,10 +50613,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}while(!other);
 	}
 	// only one of the two threads can set the all are identical state
-	allareidentical -= static_cast<unsigned>(other);// codes:
+	allareidentical += other;// codes for the meaning of allareidentical:
 	// 0: continue processing
-	// -1: input from the main thread
-	// 1: input from this thread
+	// 1: input from the main thread
+	// ~0: input from the companion thread
 
 	if(!allareidentical)RSBD8_LIKELY{
 		radixsortnoallocsinglesortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, output, pzeroedindices->data(), varparameters...);
@@ -51013,7 +50981,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 
 		// transform counts into base offsets
-		unsigned allareidentical;
+		std::conditional_t<ismultithreadcapable, std::uintptr_t, unsigned> allareidentical;
 		if constexpr(ismultithreadcapable){// first barrier
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(!old) do RSBD8_LIKELY{
@@ -51039,10 +51007,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(!other);
 			}
 			// only one of the two threads can set the all are identical state
-			allareidentical -= static_cast<unsigned>(other);// codes:
+			allareidentical += other;// codes for the meaning of allareidentical:
 			// 0: continue processing
-			// -1: input from the companion thread
-			// 1: input from this thread
+			// 1: input from the main thread
+			// ~0: input from the companion thread
 		}else{// single-threaded-only
 			allareidentical = generateoffsetssinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, offsets.data());
 		}
@@ -51091,11 +51059,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pzeroedindices[-1].data())};
+	std::uintptr_t allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pzeroedindices[-1].data())};
 
 	// barrier and allareidentical value exchange with the main thread
 	// no exception detection required here
-	++allareidentical;// send over a 1 or a 2
+	allareidentical = ~allareidentical;// send over a -1 or a -2
 	std::uintptr_t other{atomiclightbarrier.fetch_add(allareidentical)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -51104,10 +51072,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}while(!other);
 	}
 	// only one of the two threads can set the all are identical state
-	allareidentical -= static_cast<unsigned>(other);// codes:
+	allareidentical += other;// codes for the meaning of allareidentical:
 	// 0: continue processing
-	// -1: input from the main thread
-	// 1: input from this thread
+	// 1: input from the main thread
+	// ~0: input from the companion thread
 
 	if(!allareidentical)RSBD8_LIKELY{
 		radixsortnoallocsinglesortmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, buffer, input, pzeroedindices->data(), varparameters...);
@@ -51474,7 +51442,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 
 		// transform counts into base offsets
-		unsigned allareidentical;
+		std::conditional_t<ismultithreadcapable, std::uintptr_t, unsigned> allareidentical;
 		if constexpr(ismultithreadcapable){// first barrier
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(!old) do RSBD8_LIKELY{
@@ -51500,10 +51468,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(!other);
 			}
 			// only one of the two threads can set the all are identical state
-			allareidentical -= static_cast<unsigned>(other);// codes:
+			allareidentical += other;// codes for the meaning of allareidentical:
 			// 0: continue processing
-			// -1: input from the companion thread
-			// 1: input from this thread
+			// 1: input from the main thread
+			// ~0: input from the companion thread
 		}else{// single-threaded-only
 			allareidentical = generateoffsetssinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, offsets.data());
 		}
@@ -56472,26 +56440,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// initial phase with regular sorting of both halves
 		// select the smallest unsigned type for the indices
 		// architecture: this compiles into just a few conditional move instructions on most platforms
-		pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>;
+		pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
 		std::size_t indexsizeofpcall{sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, std::size_t>)};
 		if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
-			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
+			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 			indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned long long>);
 		}
 		if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
-			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
+			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
 			indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned long>);
 		}
 		if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
-			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
+			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 			indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned>);
 		}
 		if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
-			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
+			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 			indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned short>);
 		}
 		if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
-			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
+			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
 			indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned char>);
 		}
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
@@ -56515,23 +56483,23 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				auto pcallsmaller{pcall};
 				static std::size_t constexpr filterlimit{std::max(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)), (limit6way + 2u) / 3u)};
 				if constexpr(ULLONG_MAX >= filterlimit && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= thirdcounttop){
-					pcallsmaller = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
+					pcallsmaller = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned long long>);
 				}
 				if constexpr(ULONG_MAX >= filterlimit && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= thirdcounttop){
-					pcallsmaller = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
+					pcallsmaller = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned long>);
 				}
 				if constexpr(UINT_MAX >= filterlimit && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= thirdcounttop){
-					pcallsmaller = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
+					pcallsmaller = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned>);
 				}
 				if constexpr(USHRT_MAX >= filterlimit && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= thirdcounttop){
-					pcallsmaller = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
+					pcallsmaller = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned short>);
 				}
 				if constexpr(UCHAR_MAX >= filterlimit && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= thirdcounttop){
-					pcallsmaller = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
+					pcallsmaller = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned char>);
 				}
 				// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
@@ -56631,26 +56599,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// initial phase with regular sorting of both halves
 		// select the smallest unsigned type for the indices
 		// architecture: this compiles into just a few conditional move instructions on most platforms
-		pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>;
+		pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
 		std::size_t indexsizeofpcall{sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, std::size_t>)};
 		if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
-			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
+			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 			indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned long long>);
 		}
 		if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
-			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
+			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
 			indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned long>);
 		}
 		if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
-			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
+			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 			indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned>);
 		}
 		if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
-			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
+			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 			indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned short>);
 		}
 		if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
-			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
+			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
 			indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned char>);
 		}
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
@@ -56674,23 +56642,23 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				auto pcallsmaller{pcall};
 				static std::size_t constexpr filterlimit{std::max(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)), (limit6way + 2u) / 3u)};
 				if constexpr(ULLONG_MAX >= filterlimit && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= thirdcounttop){
-					pcallsmaller = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
+					pcallsmaller = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned long long>);
 				}
 				if constexpr(ULONG_MAX >= filterlimit && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= thirdcounttop){
-					pcallsmaller = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
+					pcallsmaller = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned long>);
 				}
 				if constexpr(UINT_MAX >= filterlimit && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= thirdcounttop){
-					pcallsmaller = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
+					pcallsmaller = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned>);
 				}
 				if constexpr(USHRT_MAX >= filterlimit && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= thirdcounttop){
-					pcallsmaller = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
+					pcallsmaller = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned short>);
 				}
 				if constexpr(UCHAR_MAX >= filterlimit && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= thirdcounttop){
-					pcallsmaller = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
+					pcallsmaller = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned char>);
 				}
 				// round the available threads down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
@@ -58059,7 +58027,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 		if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 			pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
-			indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T， unsigned char>);
+			indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned char>);
 		}
 #else// pre-computed index size (X)
 		auto pcall{radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, true, vararguments...>};
