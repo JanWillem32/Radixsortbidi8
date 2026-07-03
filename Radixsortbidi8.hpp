@@ -54449,7 +54449,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// flip the high bit for signed values
 #endif
 		do RSBD8_LIKELY{
-			if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				U out;
 				if(!isdescsort? comphi < complo : complo < comphi){
 #if defined(_DEBUG) || defined(DEBUG)
@@ -54531,7 +54531,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}while(--halfcount);
 		if(1u & count){// odd counts will be handled here
-			if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				U out;
 				// the only modification here is this part
 				// never sample beyond the lower division (half of count, rounded down) of the array
@@ -54634,7 +54634,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscur ^= generatehighbit<U>();// flip the high bit for signed values
 #endif
 		do RSBD8_LIKELY{
-			if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				U out;
 				if(!isdescsort? curhi < curlo : curlo < curhi){
 #if defined(_DEBUG) || defined(DEBUG)
@@ -54705,7 +54705,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}while(--halfcount);
 		if(1u & count){// odd counts will be handled here
-			if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				U out;
 				// the only modification here is this part
 				// never sample beyond the lower division (half of count, rounded down) of the array
@@ -54829,7 +54829,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// flip the high bit for signed values
 #endif
 		do RSBD8_LIKELY{
-			if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				U out;
 				if(!isdescsort? comphi < complo : complo < comphi){
 #if defined(_DEBUG) || defined(DEBUG)
@@ -54927,7 +54927,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscur ^= generatehighbit<U>();// flip the high bit for signed values
 #endif
 		do RSBD8_LIKELY{
-			if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				U out;
 				if(!isdescsort? curhi < curlo : curlo < curhi){
 #if defined(_DEBUG) || defined(DEBUG)
@@ -55544,7 +55544,7 @@ handle0oddfiltered:// architecture: jump label reuse (from the else branch, incl
 lastloopfiltered:
 		*pout-- = static_cast<W>(out);
 		while(--finalcount)RSBD8_LIKELY{
-			if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 #if defined(_DEBUG) || defined(DEBUG)
 					assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
@@ -55625,7 +55625,7 @@ lastloopfiltered:
 			}
 		}
 		if(1u & count){// odd counts will be handled here
-			if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				// the only modification here is this part
 				// never sample beyond the three divisions (the start, one third and two thirds) of the array
 				if(!isdescsort? comp2 < comp1 : comp1 < comp2){
@@ -55852,7 +55852,7 @@ handle0oddunfiltered:// architecture: jump label reuse (from the else branch, in
 lastloopunfiltered:
 		*pout-- = static_cast<W>(out);
 		while(--finalcount)RSBD8_LIKELY{
-			if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				if(!isdescsort? cur2 < cur1 : cur1 < cur2){
 #if defined(_DEBUG) || defined(DEBUG)
 					assert(!(!isdescsort? previouscur < cur1 : cur1 < previouscur));
@@ -55922,7 +55922,7 @@ lastloopunfiltered:
 			}
 		}
 		if(1u & count){// odd counts will be handled here
-			if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				// the only modification here is this part
 				// never sample beyond the three divisions (the start, one third and two thirds) of the array
 				if(!isdescsort? cur2 < cur1 : cur1 < cur2){
@@ -56149,7 +56149,7 @@ handle2finalfiltered:// architecture: jump label reuse (from the else branch, in
 lastloopfiltered:
 		*pout++ = static_cast<W>(out);
 		while(--finalcount)RSBD8_LIKELY{
-			if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				if(!isdescsort? comp1 < comp0 : comp0 < comp1){
 #if defined(_DEBUG) || defined(DEBUG)
 					assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
@@ -56340,7 +56340,7 @@ handle2finalunfiltered:// architecture: jump label reuse (from the else branch, 
 lastloopunfiltered:
 		*pout++ = static_cast<W>(out);
 		while(--finalcount)RSBD8_LIKELY{
-			if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				if(!isdescsort? cur1 < cur0 : cur0 < cur1){
 #if defined(_DEBUG) || defined(DEBUG)
 					assert(!(!isdescsort? cur1 < previouscur : previouscur < cur1));
@@ -57604,7 +57604,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// flip the high bit for signed values
 #endif
 	do RSBD8_LIKELY{
-		if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 			std::intptr_t out;
 			if(!isdescsort? comphi < complo : complo < comphi){
 #if defined(_DEBUG) || defined(DEBUG)
@@ -57716,7 +57716,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}while(--halfcount);
 	if(1u & count){// odd counts will be handled here
-		if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 			std::intptr_t out;
 			// the only modification here is this part
 			// never sample beyond the lower division (half of count, rounded down) of the array
@@ -57856,7 +57856,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// flip the high bit for signed values
 #endif
 	do RSBD8_LIKELY{
-		if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 			std::intptr_t out;
 			if(!isdescsort? comphi < complo : complo < comphi){
 #if defined(_DEBUG) || defined(DEBUG)
@@ -58565,7 +58565,7 @@ handle0odd:// architecture: jump label reuse (from the else branch, including po
 lastloop:
 	*pout-- = out;
 	while(--finalcount)RSBD8_LIKELY{
-		if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 			if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 #if defined(_DEBUG) || defined(DEBUG)
 				assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
@@ -58676,7 +58676,7 @@ lastloop:
 		}
 	}
 	if(1u & count){// odd counts will be handled here
-		if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 			// the only modification here is this part
 			// never sample beyond the three divisions (the start, one third and two thirds) of the array
 			if(!isdescsort? comp2 < comp1 : comp1 < comp2){
@@ -58980,7 +58980,7 @@ handle2final:// architecture: jump label reuse (from the else branch, including 
 lastloop:
 	*pout++ = out;
 	while(--finalcount)RSBD8_LIKELY{
-		if constexpr(defaultgprfilesize < gprfilesize::large || sizeof(std::uintptr_t) < sizeof(W)){// architecture: don't flatten the branch when there's few registers or if more registers are required for large types
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 			if(!isdescsort? comp1 < comp0 : comp0 < comp1){
 #if defined(_DEBUG) || defined(DEBUG)
 				assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
