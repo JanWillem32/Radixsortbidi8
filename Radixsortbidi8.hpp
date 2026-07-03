@@ -12611,7 +12611,8 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 			skipsteps |= b << (offsetsloopcountsplitup<T> - 1u);
 		}
 	}
-	return{{skipsteps, paritybool}};// paritybool will be 1 for when the swap count is odd
+	assert(skipsteps || !paritybool);// paritybool should only be the parity of bits generated for this part's skipsteps
+	return{{skipsteps, paritybool}};// paritybool will be 1 for when the swap count is odd, but only after combining with the main thread's paritybool
 }
 
 // version for the main thread when multithreading is used at compile time
@@ -14566,6 +14567,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
 	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
@@ -15111,6 +15113,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
 	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
@@ -17456,6 +17459,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
 	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
@@ -18234,6 +18238,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
 	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
@@ -19871,6 +19876,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
 	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
@@ -20383,6 +20389,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
 	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
@@ -22011,6 +22018,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
 	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
@@ -22726,6 +22734,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
 	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
@@ -24487,6 +24496,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
 	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
@@ -25025,6 +25035,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
 	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
@@ -27188,6 +27199,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
 	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
@@ -28008,6 +28020,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
 	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
@@ -32002,6 +32015,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
 	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
@@ -34055,6 +34069,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
 	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
@@ -40368,6 +40383,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
 	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
@@ -43975,6 +43991,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
 	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
 	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
