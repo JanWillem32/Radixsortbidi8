@@ -49,7 +49,7 @@ See "Performance tests" for more details about array sizes, types and achievable
 - Utilities to implement the 8 combinations of absolute value, signed type and floating-point type sorting modes
 - Utilities to produce the accumulated index counts from multple arrays
 - Utilities to implement the index counts to offsets transforms
-- Utilities to establish the tresholds for 2-, 4-, 6-, 8- and 16-way multithreading
+- Utilities to establish the tresholds for 2-, 4-, 6-, 8-, 12- and 18-way multithreading
 - Function implementation templates for 80-bit-based long double types without indirection
 - Function implementation templates for 80-bit-based long double types with indirection
 - Function implementation templates for split up 128-bit types without indirection
@@ -294,7 +294,7 @@ Incompatibility: on the x86-32 platform SSE feature support by the CPU is uncond
 For a similar reason as on x64, prefetcht0 is expected to be available to do basic prefetching for reading data from and possibly writing data to a soon to be used cache line.
 ### Design matters
 Sorting unfiltered integer values is the fastest, followed up by floating-point values in this library.
-Filtering costs vary per item, see "Utilities to establish the tresholds for 2-, 4-, 6-, 8- and 16-way multithreading" for some insights into that.
+Filtering costs vary per item, see "Utilities to establish the tresholds for 2-, 4-, 6-, 8-, 12- and 18-way multithreading" for some insights into that.
 For 64-bit and larger systems complete 128-bit integer and floating-point support is available in this library, whether or not such types exist in the environment.
 Unsigned 128-bit and larger integers can be sorted by sequential sorting from the bottom to the top parts as unsigned (64-bit) elements when using indirection.
 Signed 128-bit and larger integers are sorted the same, with only the topmost (64-bit) element sorted as signed because of the sign bit. This does not work when filtered by the absolute modes.
@@ -478,7 +478,7 @@ Sorting with indirection on these radix sort functions is 1.736 times slower for
 ```
 These performance test results are for multithreaded sorting on an input array of 8 KiB with random bits (with no indirection, and NaN/infinity values filtered out before the tests).
 The implemented radix sort functions will however not trigger multithreading on a small input like this.
-See "Utilities to establish the tresholds for 2-, 4-, 6-, 8- and 16-way multithreading" for figures on that subject.
+See "Utilities to establish the tresholds for 2-, 4-, 6-, 8-, 12- and 18-way multithreading" for figures on that subject.
 #### std::stable_sort() or std::sort() (only if stable, fastest one of the two is selected) vs rsbd8::radixsort(), measured in 10 ns units:
 ```
 - float : 632224 vs 228628, a factor of 2.765 in speedup
