@@ -13610,9 +13610,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
+	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps
 		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	if(offsetsloopcount<T> - 2u == shifter)RSBD8_UNLIKELY goto handlebelowtop;// rare, but possible
 	if(offsetsloopcount<T> - 2u < shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
@@ -13637,6 +13637,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			pwb[0].signexponent = static_cast<W>(outeb);
 			pwb[0].mantissa = outmb;
 		}while(--j);
+		std::uintptr_t key{static_cast<std::uintptr_t>(runsteps)};
 		runsteps >>= 1;
 		if(!runsteps)RSBD8_UNLIKELY return;
 		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
@@ -13644,7 +13645,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrchi = pdst;
-		std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
 		pdst = pdstnext;
 		pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 		psrchi += count;
@@ -13654,7 +13655,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if(!old) do RSBD8_LIKELY{
 			spinpause();
-		}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
+		}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 	}
 	if((offsetsloopcount<T> - 2u) * typeradix<T> == shifter)RSBD8_UNLIKELY goto handlebelowtop;// rare, but possible
 	if((offsetsloopcount<T> - 2u) * typeradix<T> < shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
@@ -13718,15 +13719,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(--j);
 #endif
 		}
-		runsteps >>= 1;
-		if(!runsteps)RSBD8_UNLIKELY return;
 		{
+			std::uintptr_t key{static_cast<std::uintptr_t>(runsteps)};
+			runsteps >>= 1;
+			if(!runsteps)RSBD8_UNLIKELY return;
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
 			pdst = pdstnext;
 			pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 			psrchi += count;
@@ -13736,7 +13738,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
-			}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
+			}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 		}
 		// handle the top two parts differently
 		if(offsetsloopcountsplitup<T> * typeradix<T> <= shifter)RSBD8_UNLIKELY{
@@ -13795,9 +13797,9 @@ handlebelowtop:
 					pwd[0].mantissa = outmd;
 				}while(--j);
 #endif
-				if(1u == runsteps)RSBD8_UNLIKELY return;
 				{
-					std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+					if(1u == runsteps)RSBD8_UNLIKELY return;
+					std::uintptr_t old{atomiclightbarrier.fetch_add(runsteps)};
 					// swap the pointers for the next round, data is moved on each iteration
 					psrchi = pdst;
 					pdst = pdstnext;
@@ -13805,7 +13807,7 @@ handlebelowtop:
 					psrchi += count;
 					if(!old) do RSBD8_LIKELY{
 						spinpause();
-					}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
+					}while(runsteps == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 				}
 			}
 handletop:
@@ -13875,7 +13877,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT , std::nullptr_t> atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT, std::nullptr_t> atomiclightbarrier)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128u == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
 	assert(count && count != SIZE_MAX);
@@ -13893,9 +13895,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps
 		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	if(offsetsloopcount<T> - 2u == shifter)RSBD8_UNLIKELY goto handlebelowtop;// rare, but possible
 	if(offsetsloopcount<T> - 2u < shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
@@ -13961,6 +13963,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pw[0].mantissa = outm;
 			}
 		}
+		RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
 		runsteps >>= 1;
 		if(!runsteps)RSBD8_UNLIKELY return;
 		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
@@ -13968,8 +13971,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrclo = pdst;
-		RSBD8_MAYBE_UNUSED std::uintptr_t old;
-		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
 		pdst = pdstnext;
 		pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
@@ -13978,7 +13980,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 			spinpause();
-		}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
+		}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 	}
 	// also compensate for the remainder radix difference
 	shifter -= 32u + typeradix<T> - typeradixremainder<T>;
@@ -14107,16 +14109,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pw[0].mantissa = outm;
 			}
 		}
-		runsteps >>= 1;
-		if(!runsteps)RSBD8_UNLIKELY return;
 		{
+			RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
+			runsteps >>= 1;
+			if(!runsteps)RSBD8_UNLIKELY return;
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrclo = pdst;
-			RSBD8_MAYBE_UNUSED std::uintptr_t old;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
 			pdst = pdstnext;
 			pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
@@ -14125,7 +14127,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 		}
 		// handle the top two parts differently
 		if(offsetsloopcountsplitup<T> * typeradix<T> <= shifter)RSBD8_UNLIKELY{
@@ -14277,17 +14279,16 @@ handlebelowtop:
 						pw[0].mantissa = outm;
 					}
 				}
-				runsteps >>= 1;
-				if(!runsteps)RSBD8_UNLIKELY return;
-				RSBD8_MAYBE_UNUSED std::uintptr_t old;
-				if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+				RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
+				if(1u == runsteps)RSBD8_UNLIKELY return;
+				if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
 				// swap the pointers for the next round, data is moved on each iteration
 				psrclo = pdst;
 				pdst = pdstnext;
 				// unused: pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 				if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 					spinpause();
-				}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
+				}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 			}
 handletop:
 			if constexpr(ismultithreadcapable){
@@ -14473,16 +14474,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set before the data exchange
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
 	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
-	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 4u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -14495,9 +14496,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
+	runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= paritybool;// this can remove possible carry-out before the next right shift
-	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
 	// flip the relevant bits inside runsteps first
@@ -14523,7 +14523,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-#if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
 	std::future<void>
@@ -14946,13 +14946,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one before the data exchange
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, 0u)};
 
-			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 2u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
+			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
@@ -14966,9 +14966,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
+			runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
-			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), 0u)};
 			runsteps = runstepsparitybool[0];
@@ -14986,7 +14985,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultisortmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
-#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
@@ -15019,16 +15018,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set before the data exchange
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
 	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
-	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 4u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -15041,9 +15040,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
+	runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= paritybool;// this can remove possible carry-out before the next right shift
-	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
 	// flip the relevant bits inside runsteps first
@@ -15069,7 +15067,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-#if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
 	std::future<void>
@@ -15573,13 +15571,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one before the data exchange
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, movetobuffer)};
 
-			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 2u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
+			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
@@ -15593,9 +15591,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
+			runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
-			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), movetobuffer)};
 			runsteps = runstepsparitybool[0];
@@ -15613,7 +15610,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultisortmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
-#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
@@ -16129,9 +16126,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
+	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps
 		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	if(offsetsloopcount<T> - 2u == shifter)RSBD8_UNLIKELY goto handlebelowtop;// rare, but possible
 	if(offsetsloopcount<T> - 2u < shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
@@ -16164,6 +16161,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			pdst[offseta] = pa;
 			pdst[offsetb] = pb;
 		}while(--j);
+		std::uintptr_t key{static_cast<std::uintptr_t>(runsteps)};
 		runsteps >>= 1;
 		if(!runsteps)RSBD8_UNLIKELY return;
 		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
@@ -16171,7 +16169,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrchi = pdst;
-		std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
 		pdst = pdstnext;
 		pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 		psrchi += count;
@@ -16182,7 +16180,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if(!old) do RSBD8_LIKELY{
 			spinpause();
 			old = atomiclightbarrier.load(std::memory_order_relaxed);
-		}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+		}while(key == old);// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 		}
@@ -16267,15 +16265,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(--j);
 #endif
 		}
-		runsteps >>= 1;
-		if(!runsteps)RSBD8_UNLIKELY return;
 		{
+			std::uintptr_t key{static_cast<std::uintptr_t>(runsteps)};
+			runsteps >>= 1;
+			if(!runsteps)RSBD8_UNLIKELY return;
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
 			pdst = pdstnext;
 			pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 			psrchi += count;
@@ -16286,7 +16285,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+			}while(key == old);// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 			}
@@ -16366,9 +16365,9 @@ handlebelowtop:
 					pdst[offsetd] = pd;
 				}while(--j);
 #endif
-				if(1u == runsteps)RSBD8_UNLIKELY return;
 				{
-					std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+					if(1u == runsteps)RSBD8_UNLIKELY return;
+					std::uintptr_t old{atomiclightbarrier.fetch_add(runsteps)};
 					// swap the pointers for the next round, data is moved on each iteration
 					psrchi = pdst;
 					pdst = pdstnext;
@@ -16377,7 +16376,7 @@ handlebelowtop:
 					if(!old) do RSBD8_LIKELY{
 						spinpause();
 						old = atomiclightbarrier.load(std::memory_order_relaxed);
-					}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+					}while(runsteps == old);// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 					}
@@ -16467,7 +16466,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT , std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U =
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -16493,9 +16492,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps
 		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	if(offsetsloopcount<T> - 2u == shifter)RSBD8_UNLIKELY goto handlebelowtop;// rare, but possible
 	if(offsetsloopcount<T> - 2u < shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
@@ -16599,6 +16598,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = p;
 			}
 		}
+		RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
 		runsteps >>= 1;
 		if(!runsteps)RSBD8_UNLIKELY return;
 		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
@@ -16606,8 +16606,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrclo = pdst;
-		RSBD8_MAYBE_UNUSED std::uintptr_t old;
-		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
 		pdst = pdstnext;
 		pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
@@ -16615,10 +16614,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable){
-			if(!old) do RSBD8_LIKELY{
+			if(usemultithread > old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(key == old);// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 			}
@@ -16836,16 +16835,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = p;
 			}
 		}
-		runsteps >>= 1;
-		if(!runsteps)RSBD8_UNLIKELY return;
 		{
+			RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
+			runsteps >>= 1;
+			if(!runsteps)RSBD8_UNLIKELY return;
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrclo = pdst;
-			RSBD8_MAYBE_UNUSED std::uintptr_t old;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
 			pdst = pdstnext;
 			pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
@@ -16853,10 +16852,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable){
-				if(!old) do RSBD8_LIKELY{
+				if(usemultithread > old) do RSBD8_LIKELY{
 					spinpause();
 					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one
+				}while(key == old);// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 				}
@@ -17083,19 +17082,19 @@ handlebelowtop:
 						pdst[offset] = p;
 					}
 				}
-				if(1u == runsteps)RSBD8_UNLIKELY return;
 				{
-					RSBD8_MAYBE_UNUSED std::uintptr_t old;
-					if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+					RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
+					if(1u == runsteps)RSBD8_UNLIKELY return;
+					if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
 					// swap the pointers for the next round, data is moved on each iteration
 					psrclo = pdst;
 					pdst = pdstnext;
 					// unused: pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 					if constexpr(ismultithreadcapable){
-						if(!old) do RSBD8_LIKELY{
+						if(usemultithread > old) do RSBD8_LIKELY{
 							spinpause();
 							old = atomiclightbarrier.load(std::memory_order_relaxed);
-						}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one
+						}while(key == old);// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 						if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 							if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 						}
@@ -17361,7 +17360,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
 		old = atomiclightbarrier.load(std::memory_order_relaxed);
-	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set before the data exchange
 	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
@@ -17372,9 +17371,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
-	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 4u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -17387,9 +17386,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
+	runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= paritybool;// this can remove possible carry-out before the next right shift
-	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
 	// flip the relevant bits inside runsteps first
@@ -17414,7 +17412,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>,
-#if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
 	std::future<void>
@@ -18054,7 +18052,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one before the data exchange
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return// the companion thread produced an exception
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
@@ -18068,8 +18066,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// no exception detection required here
-			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 2u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
+			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
@@ -18083,9 +18081,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
+			runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
-			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), 0u)};
 			runsteps = runstepsparitybool[0];
@@ -18103,7 +18100,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultisortmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, input, pdst, pdstnext, offsets.data(), runsteps, usemultithread, atomiclightbarrier, varparameters...);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
-#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
@@ -18140,7 +18137,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
 		old = atomiclightbarrier.load(std::memory_order_relaxed);
-	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set before the data exchange
 	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
@@ -18151,9 +18148,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
-	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 4u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -18166,9 +18163,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
+	runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= paritybool;// this can remove possible carry-out before the next right shift
-	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
 	// flip the relevant bits inside runsteps first
@@ -18193,7 +18189,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>,
-#if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
 	std::future<void>
@@ -18926,7 +18922,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one before the data exchange
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return// the companion thread produced an exception
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
@@ -18940,8 +18936,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// no exception detection required here
-			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 2u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
+			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
@@ -18955,9 +18951,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
+			runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
-			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), movetobuffer)};
 			runsteps = runstepsparitybool[0];
@@ -18975,7 +18970,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultisortmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, psrclo, pdst, psrclo, offsets.data(), runsteps, usemultithread, atomiclightbarrier, varparameters...);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
-#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
@@ -19371,9 +19366,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
+	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps
 		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	while(64u > shifter)RSBD8_LIKELY{// low 64 bits
 		static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 		// architecture: limit to four at a time when there's a decent amount of registers
@@ -19395,6 +19390,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			pdst[offsetc] = outc;
 			pdst[offsetd] = outd;
 		}while(--j);
+		std::uintptr_t key{static_cast<std::uintptr_t>(runsteps)};
 		runsteps >>= 1;
 		if(!runsteps)RSBD8_UNLIKELY return;
 		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
@@ -19402,7 +19398,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrchi = pdst;
-		std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
 		pdst = pdstnext;
 		pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 		psrchi += count;
@@ -19412,7 +19408,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if(!old) do RSBD8_LIKELY{
 			spinpause();
-		}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
+		}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 	}
 	if constexpr(!isabsvalue && isfltpmode) if(128u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	// also compensate for the remainder radix difference
@@ -19441,15 +19437,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetd] = outd;
 			}while(--j);
 		}
-		runsteps >>= 1;
-		if(!runsteps)RSBD8_UNLIKELY return;
 		{
+			std::uintptr_t key{static_cast<std::uintptr_t>(runsteps)};
+			runsteps >>= 1;
+			if(!runsteps)RSBD8_UNLIKELY return;
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
 			pdst = pdstnext;
 			pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 			psrchi += count;
@@ -19459,7 +19456,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
-			}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
+			}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 		}
 		// handle the top part for floating-point differently
 		if(!isabsvalue && isfltpmode && typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
@@ -19494,7 +19491,7 @@ template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, boo
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT , std::nullptr_t> atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT, std::nullptr_t> atomiclightbarrier)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -19520,9 +19517,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps
 		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	while(64u > shifter)RSBD8_LIKELY{// low 64 bits
 		if constexpr(ismultithreadcapable){
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
@@ -19583,6 +19580,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = out;
 			}
 		}
+		RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
 		runsteps >>= 1;
 		if(!runsteps)RSBD8_UNLIKELY return;
 		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
@@ -19590,8 +19588,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrclo = pdst;
-		RSBD8_MAYBE_UNUSED std::uintptr_t old;
-		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
 		pdst = pdstnext;
 		pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
@@ -19600,7 +19597,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 			spinpause();
-		}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
+		}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 	}
 	if constexpr(!isabsvalue && isfltpmode) if(128u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	// also compensate for the remainder radix difference
@@ -19666,16 +19663,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = out;
 			}
 		}
-		runsteps >>= 1;
-		if(!runsteps)RSBD8_UNLIKELY return;
 		{
+			RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
+			runsteps >>= 1;
+			if(!runsteps)RSBD8_UNLIKELY return;
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrclo = pdst;
-			RSBD8_MAYBE_UNUSED std::uintptr_t old;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
 			pdst = pdstnext;
 			pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
@@ -19684,7 +19681,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 		}
 		// handle the top part for floating-point differently
 		if(!isabsvalue && isfltpmode && typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
@@ -19782,16 +19779,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set before the data exchange
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
 	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
-	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 4u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -19804,9 +19801,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
+	runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= paritybool;// this can remove possible carry-out before the next right shift
-	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
 	// flip the relevant bits inside runsteps first
@@ -19829,7 +19825,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-#if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
 	std::future<void>
@@ -20225,13 +20221,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one before the data exchange
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, 0u)};
 
-			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 2u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
+			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
@@ -20245,9 +20241,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
+			runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
-			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), 0u)};
 			runsteps = runstepsparitybool[0];
@@ -20265,7 +20260,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultisortmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
-#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
@@ -20295,16 +20290,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set before the data exchange
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
 	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
-	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 4u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -20317,9 +20312,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
+	runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= paritybool;// this can remove possible carry-out before the next right shift
-	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
 	// flip the relevant bits inside runsteps first
@@ -20342,7 +20336,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-#if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
 	std::future<void>
@@ -20744,13 +20738,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one before the data exchange
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, movetobuffer)};
 
-			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 2u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
+			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
@@ -20764,9 +20758,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
+			runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
-			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), movetobuffer)};
 			runsteps = runstepsparitybool[0];
@@ -20784,7 +20777,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultisortmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
-#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
@@ -21181,9 +21174,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
+	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps
 		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	while(64u > shifter)RSBD8_LIKELY{// low 64 bits
 		static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 		// architecture: limit to four at a time when there's a decent amount of registers
@@ -21227,6 +21220,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			pdst[offsetc] = pc;
 			pdst[offsetd] = pd;
 		}while(--j);
+		std::uintptr_t key{static_cast<std::uintptr_t>(runsteps)};
 		runsteps >>= 1;
 		if(!runsteps)RSBD8_UNLIKELY return;
 		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
@@ -21234,7 +21228,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrchi = pdst;
-		std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
 		pdst = pdstnext;
 		pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 		psrchi += count;
@@ -21245,7 +21239,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if(!old) do RSBD8_LIKELY{
 			spinpause();
 			old = atomiclightbarrier.load(std::memory_order_relaxed);
-		}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+		}while(key == old);// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 		}
@@ -21299,15 +21293,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetd] = pd;
 			}while(--j);
 		}
-		runsteps >>= 1;
-		if(!runsteps)RSBD8_UNLIKELY return;
 		{
+			std::uintptr_t key{static_cast<std::uintptr_t>(runsteps)};
+			runsteps >>= 1;
+			if(!runsteps)RSBD8_UNLIKELY return;
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
 			pdst = pdstnext;
 			pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 			psrchi += count;
@@ -21318,7 +21313,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+			}while(key == old);// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 			}
@@ -21379,7 +21374,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT , std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
@@ -21406,9 +21401,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps
 		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	while(64u > shifter)RSBD8_LIKELY{// low 64 bits
 		if constexpr(ismultithreadcapable){
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
@@ -21547,6 +21542,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = p;
 			}
 		}
+		RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
 		runsteps >>= 1;
 		if(!runsteps)RSBD8_UNLIKELY return;
 		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
@@ -21554,8 +21550,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrclo = pdst;
-		RSBD8_MAYBE_UNUSED std::uintptr_t old;
-		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
 		pdst = pdstnext;
 		pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
@@ -21563,10 +21558,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable){
-			if(!old) do RSBD8_LIKELY{
+			if(usemultithread > old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(key == old);// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 			}
@@ -21714,16 +21709,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = p;
 			}
 		}
-		runsteps >>= 1;
-		if(!runsteps)RSBD8_UNLIKELY return;
 		{
+			RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
+			runsteps >>= 1;
+			if(!runsteps)RSBD8_UNLIKELY return;
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrclo = pdst;
-			RSBD8_MAYBE_UNUSED std::uintptr_t old;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
 			pdst = pdstnext;
 			pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
@@ -21731,10 +21726,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable){
-				if(!old) do RSBD8_LIKELY{
+				if(usemultithread > old) do RSBD8_LIKELY{
 					spinpause();
 					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one
+				}while(key == old);// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 				}
@@ -21920,7 +21915,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
 		old = atomiclightbarrier.load(std::memory_order_relaxed);
-	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set before the data exchange
 	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
@@ -21931,9 +21926,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
-	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 4u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -21946,9 +21941,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
+	runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= paritybool;// this can remove possible carry-out before the next right shift
-	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
 	// flip the relevant bits inside runsteps first
@@ -21972,7 +21966,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>,
-#if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
 	std::future<void>
@@ -22554,7 +22548,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one before the data exchange
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return// the companion thread produced an exception
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
@@ -22568,8 +22562,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// no exception detection required here
-			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 2u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
+			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
@@ -22583,9 +22577,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
+			runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
-			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), 0u)};
 			runsteps = runstepsparitybool[0];
@@ -22603,7 +22596,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultisortmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, input, pdst, pdstnext, offsets.data(), runsteps, usemultithread, atomiclightbarrier, varparameters...);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
-#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
@@ -22636,7 +22629,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
 		old = atomiclightbarrier.load(std::memory_order_relaxed);
-	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set before the data exchange
 	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
@@ -22647,9 +22640,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
-	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 4u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -22662,9 +22655,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
+	runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= paritybool;// this can remove possible carry-out before the next right shift
-	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
 	// flip the relevant bits inside runsteps first
@@ -22688,7 +22680,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>,
-#if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
 	std::future<void>
@@ -23268,7 +23260,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one before the data exchange
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return// the companion thread produced an exception
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
@@ -23282,8 +23274,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// no exception detection required here
-			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 2u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
+			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
@@ -23297,9 +23289,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
+			runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
-			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), movetobuffer)};
 			runsteps = runstepsparitybool[0];
@@ -23317,7 +23308,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultisortmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, psrclo, pdst, psrclo, offsets.data(), runsteps, usemultithread, atomiclightbarrier, varparameters...);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
-#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
@@ -23915,9 +23906,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
+	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps
 		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	while(32u > shifter)RSBD8_LIKELY{// low 32 bits
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
@@ -23952,6 +23943,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetd] = outd;
 			}while(--j);
 		}
+		std::uintptr_t key{static_cast<std::uintptr_t>(runsteps)};
 		runsteps >>= 1;
 		if(!runsteps)RSBD8_UNLIKELY return;
 		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
@@ -23959,7 +23951,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrchi = pdst;
-		std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
 		pdst = pdstnext;
 		pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 		psrchi += count;
@@ -23969,7 +23961,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if(!old) do RSBD8_LIKELY{
 			spinpause();
-		}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
+		}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 	}
 	if constexpr(!isabsvalue && isfltpmode) if(64u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	// also compensate for the remainder radix difference
@@ -24009,15 +24001,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetd] = outd;
 			}while(--j);
 		}
-		runsteps >>= 1;
-		if(!runsteps)RSBD8_UNLIKELY return;
 		{
+			std::uintptr_t key{static_cast<std::uintptr_t>(runsteps)};
+			runsteps >>= 1;
+			if(!runsteps)RSBD8_UNLIKELY return;
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
 			pdst = pdstnext;
 			pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 			psrchi += count;
@@ -24027,7 +24020,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
-			}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
+			}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 		}
 		// handle the top part for floating-point differently
 		if(!isabsvalue && isfltpmode && typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
@@ -24075,7 +24068,7 @@ template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, boo
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT , std::nullptr_t> atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT, std::nullptr_t> atomiclightbarrier)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -24101,9 +24094,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps
 		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	while(32u > shifter)RSBD8_LIKELY{// low 32 bits
 		if constexpr(ismultithreadcapable){
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
@@ -24177,6 +24170,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = out;
 			}
 		}
+		RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
 		runsteps >>= 1;
 		if(!runsteps)RSBD8_UNLIKELY return;
 		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
@@ -24184,8 +24178,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrclo = pdst;
-		RSBD8_MAYBE_UNUSED std::uintptr_t old;
-		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
 		pdst = pdstnext;
 		pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
@@ -24194,7 +24187,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 			spinpause();
-		}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
+		}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 	}
 	if constexpr(!isabsvalue && isfltpmode) if(64u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	// also compensate for the remainder radix difference
@@ -24273,16 +24266,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = out;
 			}
 		}
-		runsteps >>= 1;
-		if(!runsteps)RSBD8_UNLIKELY return;
 		{
+			RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
+			runsteps >>= 1;
+			if(!runsteps)RSBD8_UNLIKELY return;
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrclo = pdst;
-			RSBD8_MAYBE_UNUSED std::uintptr_t old;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
 			pdst = pdstnext;
 			pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
@@ -24291,7 +24284,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 		}
 		// handle the top part for floating-point differently
 		if(!isabsvalue && isfltpmode && typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
@@ -24402,16 +24395,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set before the data exchange
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
 	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
-	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 4u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -24424,9 +24417,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
+	runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= paritybool;// this can remove possible carry-out before the next right shift
-	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
 	// flip the relevant bits inside runsteps first
@@ -24449,7 +24441,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-#if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
 	std::future<void>
@@ -24871,13 +24863,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one before the data exchange
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, 0u)};
 
-			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 2u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
+			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
@@ -24891,9 +24883,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
+			runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
-			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), 0u)};
 			runsteps = runstepsparitybool[0];
@@ -24911,7 +24902,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultisortmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
-#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
@@ -24941,16 +24932,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set before the data exchange
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
 	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
-	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 4u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -24963,9 +24954,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
+	runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= paritybool;// this can remove possible carry-out before the next right shift
-	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
 	// flip the relevant bits inside runsteps first
@@ -24988,7 +24978,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-#if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
 	std::future<void>
@@ -25505,13 +25495,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one before the data exchange
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, movetobuffer)};
 
-			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 2u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
+			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
@@ -25525,9 +25515,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
+			runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
-			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), movetobuffer)};
 			runsteps = runstepsparitybool[0];
@@ -25545,7 +25534,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultisortmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
-#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
@@ -26159,9 +26148,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
+	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps
 		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	while(32u > shifter)RSBD8_LIKELY{// low 32 bits
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
@@ -26232,6 +26221,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetd] = pd;
 			}while(--j);
 		}
+		std::uintptr_t key{static_cast<std::uintptr_t>(runsteps)};
 		runsteps >>= 1;
 		if(!runsteps)RSBD8_UNLIKELY return;
 		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
@@ -26239,7 +26229,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrchi = pdst;
-		std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
 		pdst = pdstnext;
 		pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 		psrchi += count;
@@ -26250,7 +26240,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if(!old) do RSBD8_LIKELY{
 			spinpause();
 			old = atomiclightbarrier.load(std::memory_order_relaxed);
-		}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+		}while(key == old);// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 		}
@@ -26329,15 +26319,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetd] = pd;
 			}while(--j);
 		}
-		runsteps >>= 1;
-		if(!runsteps)RSBD8_UNLIKELY return;
 		{
+			std::uintptr_t key{static_cast<std::uintptr_t>(runsteps)};
+			runsteps >>= 1;
+			if(!runsteps)RSBD8_UNLIKELY return;
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
 			pdst = pdstnext;
 			pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 			psrchi += count;
@@ -26348,7 +26339,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+			}while(key == old);// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 			}
@@ -26436,7 +26427,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>),
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT , std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
@@ -26463,9 +26454,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps
 		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	while(32u > shifter)RSBD8_LIKELY{// low 32 bits
 		if constexpr(ismultithreadcapable){
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
@@ -26646,6 +26637,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = p;
 			}
 		}
+		RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
 		runsteps >>= 1;
 		if(!runsteps)RSBD8_UNLIKELY return;
 		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
@@ -26653,8 +26645,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrclo = pdst;
-		RSBD8_MAYBE_UNUSED std::uintptr_t old;
-		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
 		pdst = pdstnext;
 		pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
@@ -26662,10 +26653,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable){
-			if(!old) do RSBD8_LIKELY{
+			if(usemultithread > old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(key == old);// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 			}
@@ -26855,16 +26846,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = p;
 			}
 		}
-		runsteps >>= 1;
-		if(!runsteps)RSBD8_UNLIKELY return;
 		{
+			RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
+			runsteps >>= 1;
+			if(!runsteps)RSBD8_UNLIKELY return;
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrclo = pdst;
-			RSBD8_MAYBE_UNUSED std::uintptr_t old;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
 			pdst = pdstnext;
 			pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
@@ -26872,10 +26863,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable){
-				if(!old) do RSBD8_LIKELY{
+				if(usemultithread > old) do RSBD8_LIKELY{
 					spinpause();
 					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one
+				}while(key == old);// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 				}
@@ -27101,7 +27092,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
 		old = atomiclightbarrier.load(std::memory_order_relaxed);
-	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set before the data exchange
 	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
@@ -27112,9 +27103,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
-	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 4u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -27127,9 +27118,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
+	runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= paritybool;// this can remove possible carry-out before the next right shift
-	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
 	// flip the relevant bits inside runsteps first
@@ -27153,7 +27143,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>),
-#if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
 	std::future<void>
@@ -27837,7 +27827,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one before the data exchange
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return// the companion thread produced an exception
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
@@ -27851,8 +27841,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// no exception detection required here
-			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 2u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
+			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
@@ -27866,9 +27856,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
+			runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
-			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), 0u)};
 			runsteps = runstepsparitybool[0];
@@ -27886,7 +27875,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultisortmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, input, pdst, pdstnext, offsets.data(), runsteps, usemultithread, atomiclightbarrier, varparameters...);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
-#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
@@ -27922,7 +27911,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
 		old = atomiclightbarrier.load(std::memory_order_relaxed);
-	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set before the data exchange
 	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
@@ -27933,9 +27922,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
-	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 4u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -27948,9 +27937,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
+	runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= paritybool;// this can remove possible carry-out before the next right shift
-	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
 	// flip the relevant bits inside runsteps first
@@ -27974,7 +27962,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>),
-#if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
 	std::future<void>
@@ -28764,7 +28752,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one before the data exchange
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return// the companion thread produced an exception
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
@@ -28778,8 +28766,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// no exception detection required here
-			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 2u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
+			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
@@ -28793,9 +28781,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
+			runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
-			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), movetobuffer)};
 			runsteps = runstepsparitybool[0];
@@ -28813,7 +28800,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultisortmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, psrclo, pdst, psrclo, offsets.data(), runsteps, usemultithread, atomiclightbarrier, varparameters...);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
-#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
@@ -31578,9 +31565,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
+	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps
 		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	if constexpr(!isabsvalue && isfltpmode) if(offsetsloopcount<T> - 1u <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
 	for(;;){
@@ -31617,16 +31604,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetd] = static_cast<T>(outd);
 			}while(--j);
 		}
-		runsteps >>= 1;
-		if(!runsteps)RSBD8_UNLIKELY return;
 		{
+			std::uintptr_t key{static_cast<std::uintptr_t>(runsteps)};
+			runsteps >>= 1;
+			if(!runsteps)RSBD8_UNLIKELY return;
 			RSBD8_MAYBE_UNUSED unsigned index;
 			if constexpr(16u < typebitsize<T>) index = bitscanforwardportable(runsteps);// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
 			pdst = pdstnext;
 			pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 			psrchi += count;
@@ -31638,7 +31626,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
-			}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
+			}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 		}
 		// handle the top part for floating-point differently
 		if(!isabsvalue && isfltpmode && typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
@@ -31690,7 +31678,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT , std::nullptr_t> atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT, std::nullptr_t> atomiclightbarrier)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(count && count != SIZE_MAX);
 	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
@@ -31707,9 +31695,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps
 		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	if constexpr(!isabsvalue && isfltpmode) if(offsetsloopcount<T> - 1u <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
 	for(;;){
@@ -31785,17 +31773,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = static_cast<T>(out);
 			}
 		}
-		runsteps >>= 1;
-		if(!runsteps)RSBD8_UNLIKELY return;
 		{
+			RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
+			runsteps >>= 1;
+			if(!runsteps)RSBD8_UNLIKELY return;
 			RSBD8_MAYBE_UNUSED unsigned index;
 			if constexpr(16u < typebitsize<T>) index = bitscanforwardportable(runsteps);// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrclo = pdst;
-			RSBD8_MAYBE_UNUSED std::uintptr_t old;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
 			pdst = pdstnext;
 			pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
@@ -31806,7 +31794,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 		}
 		// handle the top part for floating-point differently
 		if(!isabsvalue && isfltpmode && typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
@@ -31921,16 +31909,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set before the data exchange
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
 	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
-	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 4u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -31943,9 +31931,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
+	runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= paritybool;// this can remove possible carry-out before the next right shift
-	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
 	// flip the relevant bits inside runsteps first
@@ -31972,7 +31959,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-#if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
 	std::future<void>
@@ -33901,13 +33888,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one before the data exchange
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, 0u)};
 
-			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 2u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
+			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
@@ -33921,9 +33908,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
+			runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
-			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), 0u)};
 			runsteps = runstepsparitybool[0];
@@ -33941,7 +33927,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultisortmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
-#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
@@ -33975,16 +33961,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
-	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set
+	}while(~std::uintptr_t{} == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to all bits set before the data exchange
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
 	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, pzeroedindices[-1].data())};
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
-	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 4u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -33997,9 +33983,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
+	runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= paritybool;// this can remove possible carry-out before the next right shift
-	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
 	// flip the relevant bits inside runsteps first
@@ -34026,7 +34011,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-#if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
 	std::future<void>
@@ -36608,13 +36593,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uintptr_t old{atomiclightbarrier.fetch_add(usemultithread)};
 			if(old < usemultithread) do RSBD8_LIKELY{
 				spinpause();
-			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(usemultithread == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one before the data exchange
 
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, movetobuffer)};
 
-			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 2u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
+			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
@@ -36628,9 +36613,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
+			runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
-			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), movetobuffer)};
 			runsteps = runstepsparitybool[0];
@@ -36648,7 +36632,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultisortmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
-#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
@@ -39644,9 +39628,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
+	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps
 		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	if constexpr(!isabsvalue && isfltpmode) if(offsetsloopcount<T> - 1u <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
 	for(;;){
@@ -39719,16 +39703,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetd] = pd;
 			}while(--j);
 		}
-		runsteps >>= 1;
-		if(!runsteps)RSBD8_UNLIKELY return;
 		{
+			std::uintptr_t key{static_cast<std::uintptr_t>(runsteps)};
+			runsteps >>= 1;
+			if(!runsteps)RSBD8_UNLIKELY return;
 			RSBD8_MAYBE_UNUSED unsigned index;
 			if constexpr(16u < typebitsize<T>) index = bitscanforwardportable(runsteps);// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
 			pdst = pdstnext;
 			pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 			psrchi += count;
@@ -39741,7 +39726,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+			}while(key == old);// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 			}
@@ -39830,7 +39815,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>) &&
 	8u < CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>),
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT , std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &RSBD8_RESTRICT, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(count && count != SIZE_MAX);
@@ -39848,9 +39833,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps
 		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	if constexpr(!isabsvalue && isfltpmode) if(offsetsloopcount<T> - 1u <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
 	for(;;){
@@ -40033,17 +40018,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = p;
 			}
 		}
-		runsteps >>= 1;
-		if(!runsteps)RSBD8_UNLIKELY return;
 		{
+			RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
+			runsteps >>= 1;
+			if(!runsteps)RSBD8_UNLIKELY return;
 			RSBD8_MAYBE_UNUSED unsigned index;
 			if constexpr(16u < typebitsize<T>) index = bitscanforwardportable(runsteps);// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrclo = pdst;
-			RSBD8_MAYBE_UNUSED std::uintptr_t old;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
 			pdst = pdstnext;
 			pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
@@ -40053,10 +40038,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			}
 			if constexpr(ismultithreadcapable){
-				if(!old) do RSBD8_LIKELY{
+				if(usemultithread > old) do RSBD8_LIKELY{
 					spinpause();
 					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one
+				}while(key == old);// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
 				}
@@ -40285,7 +40270,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
 		old = atomiclightbarrier.load(std::memory_order_relaxed);
-	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set before the data exchange
 	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
@@ -40296,9 +40281,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
-	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 4u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -40311,9 +40296,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
+	runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= paritybool;// this can remove possible carry-out before the next right shift
-	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
 	// flip the relevant bits inside runsteps first
@@ -40338,7 +40322,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>) &&
 	8u < CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>),
-#if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
 	std::future<void>
@@ -43807,7 +43791,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one before the data exchange
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return// the companion thread produced an exception
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
@@ -43821,8 +43805,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// no exception detection required here
-			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 2u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
+			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
@@ -43836,9 +43820,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
+			runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
-			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), 0u)};
 			runsteps = runstepsparitybool[0];
@@ -43856,7 +43839,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultisortmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, input, pdst, pdstnext, offsets.data(), runsteps, usemultithread, atomiclightbarrier, varparameters...);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
-#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
@@ -43893,7 +43876,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	if(!old) do RSBD8_LIKELY{
 		spinpause();
 		old = atomiclightbarrier.load(std::memory_order_relaxed);
-	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set
+	}while(~std::uintptr_t{} == old);// prevent the ABA problem here, as the main thread will never set it to all bits set before the data exchange
 	if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 		if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return;// the main thread produced an exception
 	}
@@ -43904,9 +43887,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 	// no exception detection required here
-	// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+	// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 	assert(runsteps || !paritybool);// sending over a 1 here is not allowed, and generateoffsetsmultimtc() will never violate that
-	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2u + static_cast<std::uintptr_t>(paritybool) - 1u};
+	std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 4u + static_cast<std::uintptr_t>(paritybool) - 1u};
 	std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
 	if(!other){
 		do RSBD8_LIKELY{
@@ -43919,9 +43902,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 	}
 	other += compound;// combine
+	runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 	paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-	other -= paritybool;// this can remove possible carry-out before the next right shift
-	runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 
 	// process the actual sorting sequence
 	// flip the relevant bits inside runsteps first
@@ -43946,7 +43928,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>) &&
 	8u < CHAR_BIT * sizeof(tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>),
-#if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
 	std::future<void>
@@ -48133,7 +48115,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 				old = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one
+			}while(usemultithread == old);// prevent the ABA problem here, as the companion thread will never set it to one before the data exchange
 			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old)RSBD8_UNLIKELY return// the companion thread produced an exception
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
@@ -48147,8 +48129,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// no exception detection required here
-			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 2u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
+			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
@@ -48162,9 +48144,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			other += compound;// combine
+			runsteps = static_cast<unsigned>(other >> 2);// this will shift out a 2 if the parity bits set by both threads are odd
 			paritybool = static_cast<unsigned>(other) & 1u;// piece together the parity from both threads
-			other -= runstepsparitybool[1];// this can remove possible carry-out before the next right shift
-			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
 		}else{// single-threaded-only
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), movetobuffer)};
 			runsteps = runstepsparitybool[0];
@@ -48182,7 +48163,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultisortmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, psrclo, pdst, psrclo, offsets.data(), runsteps, usemultithread, atomiclightbarrier, varparameters...);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
-#if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
