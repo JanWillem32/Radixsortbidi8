@@ -12927,12 +12927,12 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T),
 	std::size_t> base2waythreshold()noexcept{
-	// for unfiltered 8-bit it's 2 or 1 KiB, and for quarter-precision floating-point it's 512 B
-	// for unfiltered 16-bit it's 4 KiB, and for half-precision floating-point it's 3 KiB
-	// for unfiltered 32-bit it's 4 KiB, and for float it's 3.5 KiB
-	// for unfiltered 64-bit it's 4 KiB, and for double it's 3.75 KiB
-	// for unfiltered 80-bit it's 128 B, and for 80-bit floating-point it's 121.6 B
-	// for unfiltered 128-bit it's 128 B, and for quadruple-precision floating-point it's 124 B
+	// for unfiltered 8-bit it's 2 or 1 KiB, and for quarter-precision floating-point it's .5 KiB
+	// for unfiltered 16-bit it's 8 KiB, and for half-precision floating-point it's 6 KiB
+	// for unfiltered 32-bit it's 16 KiB, and for float it's 14 KiB
+	// for unfiltered 64-bit it's 32 KiB, and for double it's 30 KiB
+	// for unfiltered 80-bit it's 1.25 KiB, and for 80-bit floating-point it's 1.1875 KiB
+	// for unfiltered 128-bit it's 2 KiB, and for quadruple-precision floating-point it's 1.9375 KiB
 	static double constexpr lookupdirect[]{
 		// for 8-bit items some special-use single-pass radix sort functions work a bit differently
 		!(isabsvalue && issignmode) &&// both regular absolute modes
@@ -12956,11 +12956,11 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 		2048. / 16.// 128
 	};
 	// for unfiltered 8-bit it's 256 KiB, and for quarter-precision floating-point it's 128 KiB
-	// for unfiltered 16-bit it's 256 KiB, and for half-precision floating-point it's 192 KiB
-	// for unfiltered 32-bit it's 512 B, and for float it's 448 KiB
-	// for unfiltered 64-bit it's 512 B, and for double it's 480 KiB
-	// for unfiltered 80-bit it's 1 KiB, and for 80-bit floating-point it's .95 KiB
-	// for unfiltered 128-bit it's 1 KiB, and for quadruple-precision floating-point it's .96875 KiB
+	// for unfiltered 16-bit it's 512 KiB, and for half-precision floating-point it's 384 KiB
+	// for unfiltered 32-bit it's 2 KiB, and for float it's 1.75 KiB
+	// for unfiltered 64-bit it's 4 KiB, and for double it's 3.75 KiB
+	// for unfiltered 80-bit it's 10 KiB, and for 80-bit floating-point it's 9.5 KiB
+	// for unfiltered 128-bit it's 16 KiB, and for quadruple-precision floating-point it's 15.5 KiB
 	static double constexpr lookupindirect[]{
 		262144.,// 8
 		524288. / 2.,// 16
@@ -13008,13 +13008,13 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
 	std::size_t> base4waythreshold()noexcept{
-	// for unfiltered 16-bit it's 24 GiB, and for half-precision floating-point it's 18 GiB
-	// for unfiltered 32-bit it's 48 KiB, and for float it's 42 KiB
-	// for unfiltered 64-bit it's 23 KiB, and for double it's 21.5625 KiB
-	// for unfiltered 80-bit it's 11 KiB, and for 80-bit floating-point it's 10.925 KiB
-	// for unfiltered 128-bit it's 11 KiB, and for quadruple-precision floating-point it's 11.140625 KiB
+	// for unfiltered 16-bit it's 200 KiB, and for half-precision floating-point it's 150 KiB
+	// for unfiltered 32-bit it's 192 KiB, and for float it's 168 KiB
+	// for unfiltered 64-bit it's 184 KiB, and for double it's 172.5 KiB
+	// for unfiltered 80-bit it's 110 KiB, and for 80-bit floating-point it's 104.5 KiB
+	// for unfiltered 128-bit it's 176 KiB, and for quadruple-precision floating-point it's 170.5 KiB
 	static double constexpr lookupdirect[]{
-		51539607552. / 2.,// 16
+		204800. / 2.,// 16
 		200704. / 3.,// 24
 		196608. / 4.,// 32
 		194560. / 5.,// 40
@@ -13030,13 +13030,13 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 		0.,// 120
 		180224. / 16.// 128
 	};
-	// for unfiltered 16-bit it's 50 GiB, and for half-precision floating-point it's 37.5 GiB
-	// for unfiltered 32-bit it's 100 KiB, and for float it's 87.5 KiB
-	// for unfiltered 64-bit it's 23 KiB, and for double it's 21.5625 KiB
-	// for unfiltered 80-bit it's 11.5 KiB, and for 80-bit floating-point it's 10.925 KiB
-	// for unfiltered 128-bit it's 11.5 KiB, and for quadruple-precision floating-point it's 11.140625 KiB
+	// for unfiltered 16-bit it's 20 GiB, and for half-precision floating-point it's 15 GiB
+	// for unfiltered 32-bit it's 400 KiB, and for float it's 350 KiB
+	// for unfiltered 64-bit it's 184 KiB, and for double it's 172.5 KiB
+	// for unfiltered 80-bit it's 115 KiB, and for 80-bit floating-point it's 109.25 KiB
+	// for unfiltered 128-bit it's 184 KiB, and for quadruple-precision floating-point it's 178.25 KiB
 	static double constexpr lookupindirect[]{
-		107374182400. / 2.,// 16
+		21474836480. / 2.,// 16
 		520192. / 3.,// 24
 		409600. / 4.,// 32
 		354304. / 5.,// 40
@@ -13069,7 +13069,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating-point
 	static std::size_t constexpr intermediatefiltered{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
 	// with very low counts, do not allow multithreading unless the prefetch stride can be guaranteed
-	return{std::max(intermediatefiltered, 3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)))};
+	return{std::max(intermediatefiltered, 3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / (isindirect? sizeof(void *) : sizeof(T))))};
 }
 
 // function to establish the initial treshold for 8-, 12- and 18-way multithreading
@@ -13105,7 +13105,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating-point
 	static std::size_t constexpr intermediatefiltered{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
 	// with very low counts, do not allow multithreading unless the prefetch stride can be guaranteed
-	return{std::max(intermediatefiltered, 9u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)))};
+	return{std::max(intermediatefiltered, 9u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / (isindirect? sizeof(void *) : sizeof(T))))};
 }
 
 // Function implementation templates for 80-bit-based long double types without indirection
