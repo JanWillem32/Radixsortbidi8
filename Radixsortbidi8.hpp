@@ -927,23 +927,6 @@ RSBD8_FUNC_INLINE void prefetchwriteforward(void const *RSBD8_RESTRICT data)noex
 
 // Utilities for multithreaded concurrency
 
-// atomic light barrier for spinpause()-based loops (see above for that function)
-// this assumes that the initial state of atomiclightbarrier is zero
-// this is not the variant that can also do exception-safe exit signalling, see atomicvarwrapper below for a part of that implementation
-template<std::size_t threadnumber, std::size_t threadcount, typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
-	threadnumber < threadcount &&// 0-based threadnumber, make sure to give every thread a unique, sequential number
-	1 < threadcount &&// at least 2 threads
-	std::is_integral_v<T> &&
-	std::numeric_limits<std::make_unsigned_t<T>>::max() >= threadcount - 1u,
-	void> simplebarrier(std::atomic<T> &atomiclightbarrier)noexcept{
-	static T constexpr val{(threadnumber == threadcount - 1u)? ~static_cast<T>(threadnumber) + 1 : static_cast<T>(1)};
-	T old{atomiclightbarrier.fetch_add(val)};// the only modification here
-	if(~val + 1 != old) do RSBD8_LIKELY{// two's complement negation comparison
-		spinpause();
-	}while(atomiclightbarrier.load(std::memory_order_relaxed));
-}
-
 // this class is a simple RAII wrapper for the atomic variable when an exit state on destruction is needed
 // the barrier atomic variable must be able to signal if an exception occurs
 struct atomicvarwrapper{
@@ -956,7 +939,7 @@ struct atomicvarwrapper{
 	RSBD8_FUNC_INLINE ~atomicvarwrapper()noexcept{
 		if(std::uncaught_exceptions()){// this destructor is purely to handle exceptions
 			std::uintptr_t old{};// this function assumes that the barrier atomic variable freed state is zero
-				while(!main.compare_exchange_weak(old, reinterpret_cast<std::uintptr_t>(&main))){
+			while(!main.compare_exchange_weak(old, reinterpret_cast<std::uintptr_t>(&main))){
 				if(reinterpret_cast<std::uintptr_t>(&main) == old) break;// same state by another thread
 				old = 0u;
 				spinpause();
