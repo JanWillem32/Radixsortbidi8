@@ -1065,12 +1065,13 @@ struct longdoubletest128{
 		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0u, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), &discardedmantissalo), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), &discardedmantissahi), eleft, eright, &eleft)};
 		return carry;
 #else
+		std::int_least16_t eleft{static_cast<std::int_least16_t>(signexponent)}, eright{static_cast<std::int_least16_t>(other.signexponent)};
 		if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed integer mode
-			return std::tie(static_cast<std::int_least16_t>(signexponent), mantissa) <
-				std::tie(static_cast<std::int_least16_t>(other.signexponent), other.mantissa);
+			return std::tie(eleft, mantissa) <
+				std::tie(eright, other.mantissa);
 		}else{// unsigned integer mode
-			return std::tie(static_cast<std::uint_least16_t>(signexponent), mantissa) <
-				std::tie(static_cast<std::uint_least16_t>(other.signexponent), other.mantissa);
+			return std::tie(eleft, mantissa) <
+				std::tie(eright, other.mantissa);
 		}
 #endif
 	}
@@ -1320,12 +1321,13 @@ struct longdoubletest96{
 		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0u, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), &discardedmantissalo), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), &discardedmantissahi), eleft, eright, &eleft)};
 		return carry;
 #else
+		std::int_least16_t eleft{static_cast<std::int_least16_t>(signexponent)}, eright{static_cast<std::int_least16_t>(other.signexponent)};
 		if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed integer mode
-			return std::tie(static_cast<std::int_least16_t>(signexponent), mantissa) <
-				std::tie(static_cast<std::int_least16_t>(other.signexponent), other.mantissa);
+			return std::tie(eleft, mantissa) <
+				std::tie(eright, other.mantissa);
 		}else{// unsigned integer mode
-			return std::tie(static_cast<std::uint_least16_t>(signexponent), mantissa) <
-				std::tie(static_cast<std::uint_least16_t>(other.signexponent), other.mantissa);
+			return std::tie(eleft, mantissa) <
+				std::tie(eright, other.mantissa);
 		}
 #endif
 	}
@@ -1563,11 +1565,11 @@ struct longdoubletest80{
 		return carry;
 #else
 		if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed integer mode
-			return std::tie(static_cast<std::int_least16_t>(signexponent), mantissa) <
-				std::tie(static_cast<std::int_least16_t>(other.signexponent), other.mantissa);
+			return std::tie(signexponent, mantissa) <
+				std::tie(other.signexponent, other.mantissa);
 		}else{// unsigned integer mode
-			return std::tie(static_cast<std::uint_least16_t>(signexponent), mantissa) <
-				std::tie(static_cast<std::uint_least16_t>(other.signexponent), other.mantissa);
+			return std::tie(signexponent, mantissa) <
+				std::tie(other.signexponent, other.mantissa);
 		}
 #endif
 	}
@@ -1942,8 +1944,9 @@ struct test64{
 		return carry;
 #else
 		if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed integer mode
-			return std::tie(static_cast<std::int_least32_t>(data[HI]), data[LO]) <
-				std::tie(static_cast<std::int_least32_t>(other.data[HI]), other.data[LO]);
+			std::int_least32_t eleft{static_cast<std::int_least32_t>(data[HI])}, eright{static_cast<std::int_least32_t>(other.data[HI])};
+			return std::tie(eleft, data[LO]) <
+				std::tie(eright, other.data[LO]);
 		}else{// unsigned integer mode
 			return std::tie(data[HI], data[LO]) <
 				std::tie(other.data[HI], other.data[LO]);
@@ -2163,8 +2166,9 @@ struct test128{
 		return carry;
 #else
 		if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed integer mode
-			return std::tie(static_cast<std::int_least64_t>(data[HI]), data[LO]) <
-				std::tie(static_cast<std::int_least64_t>(other.data[HI]), other.data[LO]);
+			std::int_least64_t eleft{static_cast<std::int_least64_t>(data[HI])}, eright{static_cast<std::int_least64_t>(other.data[HI])};
+			return std::tie(eleft, data[LO]) <
+				std::tie(eright, other.data[LO]);
 		}else{// unsigned integer mode
 			return std::tie(data[HI], data[LO]) <
 				std::tie(other.data[HI], other.data[LO]);
