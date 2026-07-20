@@ -35,6 +35,9 @@
 // ### Compiler configuration block:
 // - Per-compiler function attributes
 // - Include statements and the last checks for compatibility
+// - Utilities to create an immediate member object pointer for the type and offset indirection wrapper functions
+// - Definition of the GetOffsetOf and getoffsetof templates
+// - Apply compiler- and platform-specific intrinsic functions headers
 // ### Internal functions implementation block (rsbd8::helper namespace):
 // - Utilities for multithreaded concurrency
 // - Utilities for general purpose register count compile-time detection
@@ -43,7 +46,6 @@
 // - Utilities to calculate sorting loop counts and offsets lengths
 // - Utilities for endianess compile-time detection
 // - Utilities to provide piecewise support and tests for 64- or 128-bit types
-// - Utilities to create an immediate member object pointer for the type and offset indirection wrapper functions
 // - Utilities to call the user-provided getter functions
 // - Utilities to split off the first parameter
 // - Utilities to retrieve the data sources from user-provided classes
@@ -86,7 +88,6 @@
 // - Up to 8-way multithreading functions with indirection
 // - Up to 16-way multithreading functions with indirection
 // ### User-facing (inline) functions block (rsbd8 namespace):
-// - Definition of the GetOffsetOf and getoffsetof templates
 // - Generic large array allocation and deallocation functions
 // - Wrapper template functions for the main sorting functions in this library
 // ### Ending:
@@ -649,7 +650,77 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 // [[maybe_unused]] (C++17)
 // __has_cpp_attribute(maybe_unused)
 #endif
-// get compiler- and platform-specific intrinsic functions headers (many items here are imported code)
+
+// Utilities to create an immediate member object pointer for the type and offset indirection wrapper functions
+
+#pragma pack(push, 1)
+template<typename T, std::ptrdiff_t indirection1> struct memberobjectgenerator;
+template<typename T>
+struct memberobjectgenerator<T, 0>{
+	T object;// no padding, as the object starts at the origin
+};
+
+template<typename T, std::ptrdiff_t indirection1>
+struct memberobjectgenerator{
+	std::byte padding[static_cast<std::size_t>(indirection1)];// this will work, but array counts are just required to be positive
+	T object;// some amount of padding is used
+};
+#pragma pack(pop)
+
+// Definition of the GetOffsetOf and getoffsetof templates
+//
+// Altered, to gain C++17 compatibility and make the simpler getoffsetof template with only one input.
+// Temporary, until a revision of "offsetof" is standardized in C++ with constexpr.
+// This part isn't used internally, but serves as a tool to the user for calculating compile-time offsets.
+// Section start of all rights reserved for the respective author (Sulley, 2024-06-15):
+// https://sulley.cc/2024/06/15/16/18/
+
+template<typename B, typename M, std::size_t Offset>
+union PaddedUnion
+{
+	char c;
+	B base;
+	memberobjectgenerator<M, static_cast<std::ptrdiff_t>(Offset)> member;
+};
+
+// ~~~~~ Begin core modification ~~~~~
+template<
+	auto MemberPtr,
+	typename B,
+	std::size_t Low,
+	std::size_t High,
+	std::size_t Mid = (Low + High) / 2u>
+struct OffsetHelper{
+	using M = std::remove_reference_t<decltype(std::declval<B>().*MemberPtr)>;
+
+	static constexpr PaddedUnion<B, M, Mid> dummy{};
+	static constexpr std::size_t GetOffsetOf()noexcept{
+		if constexpr(&(dummy.base.*MemberPtr) > &dummy.member.object){
+			return{OffsetHelper<MemberPtr, B, Mid + 1u, High>::GetOffsetOf()};
+		}else if constexpr(&(dummy.base.*MemberPtr) < &dummy.member.object){
+			return{OffsetHelper<MemberPtr, B, Low, Mid>::GetOffsetOf()};
+		}else return{Mid};
+	}
+};
+// ~~~~~ End core modification ~~~~~
+
+template<auto MemberPtr, typename B>
+constexpr std::size_t GetOffsetOf = OffsetHelper<MemberPtr, B, 0u, sizeof(B)>::GetOffsetOf();
+// Section end
+
+template<auto memberptr>
+struct memberptrsplitter{
+	template<typename C, typename M>
+	static constexpr C *classgrabber(M C:: *in)noexcept{static_cast<void>(in); return{};}
+	static auto constexpr classptr{classgrabber(memberptr)};
+	using classtype = std::remove_pointer_t<decltype(classptr)>;
+};
+
+template<auto memberptr>
+constexpr std::size_t getoffsetof{OffsetHelper<memberptr, typename memberptrsplitter<memberptr>::classtype, 0u, sizeof(typename memberptrsplitter<memberptr>::classtype)>::GetOffsetOf()};
+
+// Apply compiler- and platform-specific intrinsic functions headers
+//
 // list of required items for all platforms, to be placed in the rsbd8::helper namespace:
 // RSBD8_FUNC_INLINE void spinpause()noexcept{} for the spinlocks used in multithreaded processing
 // TODO: for now, tests were all with a stride of 512 bytes, but that could use some tuning
@@ -669,11 +740,11 @@ RSBD8_FUNC_INLINE void spinpause()noexcept{_mm_pause();}
 std::size_t constexpr prefetchmaxstride{512u};
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + indirection1, _MM_HINT_T0);}
+	std::is_member_object_pointer_v<decltype(indirection1)>,
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + getoffsetof<indirection1>, _MM_HINT_T0);}
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	!std::is_integral_v<decltype(indirection1)>,
+	!std::is_member_object_pointer_v<decltype(indirection1)>,
 	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data), _MM_HINT_T0);}
 RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) - prefetchmaxstride, _MM_HINT_T0);}
 RSBD8_FUNC_INLINE void prefetchforward(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + prefetchmaxstride, _MM_HINT_T0);}
@@ -691,11 +762,11 @@ RSBD8_FUNC_INLINE void spinpause()noexcept{__dmb(_ARM64_BARRIER_ISHST); __yield(
 std::size_t constexpr prefetchmaxstride{512u};
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) + indirection1, (0u << 3) | (0u << 1) | (0u << 0));}
+	std::is_member_object_pointer_v<decltype(indirection1)>,
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) + getoffsetof<indirection1>, (0u << 3) | (0u << 1) | (0u << 0));}
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	!std::is_integral_v<decltype(indirection1)>,
+	!std::is_member_object_pointer_v<decltype(indirection1)>,
 	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data), (0u << 3) | (0u << 1) | (0u << 0));}
 // ARM64_PREFETCH_PLD | ARM64_PREFETCH_L1 | ARM64_PREFETCH_KEEP
 RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride, (0u << 3) | (0u << 1) | (0u << 0));}
@@ -709,11 +780,11 @@ RSBD8_FUNC_INLINE void spinpause()noexcept{__dmb(_ARM_BARRIER_ISHST); __yield();
 std::size_t constexpr prefetchmaxstride{512u};
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__prefetch(reinterpret_cast<std::byte const *>(data) + indirection1);}
+	std::is_member_object_pointer_v<decltype(indirection1)>,
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__prefetch(reinterpret_cast<std::byte const *>(data) + getoffsetof<indirection1>);}
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	!std::is_integral_v<decltype(indirection1)>,
+	!std::is_member_object_pointer_v<decltype(indirection1)>,
 	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__prefetch(reinterpret_cast<std::byte const *>(data));}
 RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{__prefetch(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride);}
 RSBD8_FUNC_INLINE void prefetchforward(void const *RSBD8_RESTRICT data)noexcept{__prefetch(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride);}
@@ -748,11 +819,11 @@ RSBD8_FUNC_INLINE void spinpause()noexcept{_mm_pause();}
 std::size_t constexpr prefetchmaxstride{512u};
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + indirection1, _MM_HINT_T0);}
+	std::is_member_object_pointer_v<decltype(indirection1)>,
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + getoffsetof<indirection1>, _MM_HINT_T0);}
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	!std::is_integral_v<decltype(indirection1)>,
+	!std::is_member_object_pointer_v<decltype(indirection1)>,
 	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data), _MM_HINT_T0);}
 RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) - prefetchmaxstride, _MM_HINT_T0);}
 RSBD8_FUNC_INLINE void prefetchforward(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + prefetchmaxstride, _MM_HINT_T0);}
@@ -898,11 +969,11 @@ namespace helper{// this libary defines a number of helper items, so categorise 
 std::size_t constexpr prefetchmaxstride{512u};
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) + indirection1, 0, 3);}
+	std::is_member_object_pointer_v<decltype(indirection1)>,
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) + getoffsetof<indirection1>, 0, 3);}
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	!std::is_integral_v<decltype(indirection1)>,
+	!std::is_member_object_pointer_v<decltype(indirection1)>,
 	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data), 0, 3);}
 RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride, 0, 3);}
 RSBD8_FUNC_INLINE void prefetchforward(void const *RSBD8_RESTRICT data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride, 0, 3);}
@@ -913,11 +984,11 @@ RSBD8_FUNC_INLINE void prefetchwriteforward(void const *RSBD8_RESTRICT data)noex
 std::size_t constexpr prefetchmaxstride{512u};
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) + indirection1);}
+	std::is_member_object_pointer_v<decltype(indirection1)>,
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) + getoffsetof<indirection1>);}
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	!std::is_integral_v<decltype(indirection1)>,
+	!std::is_member_object_pointer_v<decltype(indirection1)>,
 	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data));}
 RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride);}
 RSBD8_FUNC_INLINE void prefetchforward(void const *RSBD8_RESTRICT data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride);}
@@ -2328,22 +2399,6 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	return{ret};
 }
 #endif
-
-// Utilities to create an immediate member object pointer for the type and offset indirection wrapper functions
-
-#pragma pack(push, 1)
-template<typename T, std::ptrdiff_t indirection1> struct memberobjectgenerator;
-template<typename T>
-struct memberobjectgenerator<T, 0>{
-	T object;// no padding, as the object starts at the origin
-};
-
-template<typename T, std::ptrdiff_t indirection1>
-struct memberobjectgenerator{
-	std::byte padding[static_cast<std::size_t>(indirection1)];// this will work, but array counts are just required to be positive
-	T object;// some amount of padding is used
-};
-#pragma pack(pop)
 
 // Utilities to call the user-provided getter functions
 //
@@ -60007,58 +60062,6 @@ constexpr bool isrevorderwithoutindirection{
 };
 }// namespace helper
 
-// Definition of the GetOffsetOf and getoffsetof templates
-//
-// Altered, to gain C++17 compatibility and make the simpler getoffsetof template with only one input.
-// Temporary, until a revision of "offsetof" is standardized in C++ with constexpr.
-// This part isn't used internally, but serves as a tool to the user for calculating compile-time offsets.
-// Section start of all rights reserved for the respective author (Sulley, 2024-06-15):
-// https://sulley.cc/2024/06/15/16/18/
-
-template<typename B, typename M, std::size_t Offset>
-union PaddedUnion
-{
-	char c;
-	B base;
-	helper::memberobjectgenerator<M, static_cast<std::ptrdiff_t>(Offset)> member;
-};
-
-// ~~~~~ Begin core modification ~~~~~
-template<
-	auto MemberPtr,
-	typename B,
-	std::size_t Low,
-	std::size_t High,
-	std::size_t Mid = (Low + High) / 2u>
-struct OffsetHelper{
-	using M = std::remove_reference_t<decltype(std::declval<B>().*MemberPtr)>;
-
-	static constexpr PaddedUnion<B, M, Mid> dummy{};
-	static constexpr std::size_t GetOffsetOf()noexcept{
-		if constexpr(&(dummy.base.*MemberPtr) > &dummy.member.object){
-			return{OffsetHelper<MemberPtr, B, Mid + 1u, High>::GetOffsetOf()};
-		}else if constexpr(&(dummy.base.*MemberPtr) < &dummy.member.object){
-			return{OffsetHelper<MemberPtr, B, Low, Mid>::GetOffsetOf()};
-		}else return{Mid};
-	}
-};
-// ~~~~~ End core modification ~~~~~
-
-template<auto MemberPtr, typename B>
-constexpr std::size_t GetOffsetOf = OffsetHelper<MemberPtr, B, 0u, sizeof(B)>::GetOffsetOf();
-// Section end
-
-template<auto memberptr>
-struct memberptrsplitter{
-	template<typename C, typename M>
-	static constexpr C *classgrabber(M C:: *in)noexcept{static_cast<void>(in); return{};}
-	static auto constexpr classptr{classgrabber(memberptr)};
-	using classtype = std::remove_pointer_t<decltype(classptr)>;
-};
-
-template<auto memberptr>
-constexpr std::size_t getoffsetof{OffsetHelper<memberptr, typename memberptrsplitter<memberptr>::classtype, 0u, sizeof(typename memberptrsplitter<memberptr>::classtype)>::GetOffsetOf()};
-
 // Generic large array allocation and deallocation functions
 
 // allocation failed if the pbuffer member of the output is a nullptr
@@ -60769,10 +60772,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static bool constexpr isdescsort{helper::isdescsort<direction>};
 	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
-	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, 0>,
-		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
-		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
-		helper::memberobjectgenerator<U, 0>>>>;
+	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_const_v<T>, const memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_volatile_v<T>, volatile memberobjectgenerator<U, 0>,
+		memberobjectgenerator<U, 0>>>>;
 	helper::radixsortcopynoallocmulti<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count,
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		allowedthreads, pfuturesplaceholder,
@@ -60804,10 +60807,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static bool constexpr isdescsort{helper::isdescsort<direction>};
 	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
-	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, 0>,
-		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
-		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
-		helper::memberobjectgenerator<U, 0>>>>;
+	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_const_v<T>, const memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_volatile_v<T>, volatile memberobjectgenerator<U, 0>,
+		memberobjectgenerator<U, 0>>>>;
 	helper::radixsortnoallocmulti<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count,
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		allowedthreads, pfuturesplaceholder,
@@ -60838,10 +60841,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static bool constexpr isdescsort{helper::isdescsort<direction>};
 	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
-	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, 0>,
-		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
-		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
-		helper::memberobjectgenerator<U, 0>>>>;
+	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_const_v<T>, const memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_volatile_v<T>, volatile memberobjectgenerator<U, 0>,
+		memberobjectgenerator<U, 0>>>>;
 	helper::radixsortcopynoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count,
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		allowedthreads, pfuturesplaceholder,
@@ -60900,10 +60903,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static bool constexpr isdescsort{helper::isdescsort<direction>};
 	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
-	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, 0>,
-		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
-		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
-		helper::memberobjectgenerator<U, 0>>>>;
+	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_const_v<T>, const memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_volatile_v<T>, volatile memberobjectgenerator<U, 0>,
+		memberobjectgenerator<U, 0>>>>;
 	helper::radixsortnoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count,
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		allowedthreads, pfuturesplaceholder,
@@ -60935,10 +60938,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static bool constexpr isdescsort{helper::isdescsort<direction>};
 	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
-	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, 0>,
-		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
-		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
-		helper::memberobjectgenerator<U, 0>>>>;
+	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_const_v<T>, const memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_volatile_v<T>, volatile memberobjectgenerator<U, 0>,
+		memberobjectgenerator<U, 0>>>>;
 	if(!movetobuffer) helper::radixsortnoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count,
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		allowedthreads, pfuturesplaceholder,
@@ -61536,10 +61539,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static bool constexpr isdescsort{helper::isdescsort<direction>};
 	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using W = helper::tounifunsigned<std::remove_pointer_t<T>, isabsvalue, issignmode, isfltpmode>;
-	using U = std::conditional_t<std::is_const_v<V> && std::is_volatile_v<V>, const volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
-		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
-		std::conditional_t<std::is_volatile_v<V>, volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
-		helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
+	using U = std::conditional_t<std::is_const_v<V> && std::is_volatile_v<V>, const volatile memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
+		std::conditional_t<std::is_const_v<V>, const memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
+		std::conditional_t<std::is_volatile_v<V>, volatile memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
+		memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
 	helper::radixsortcopynoallocmulti<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count,
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		allowedthreads, pfuturesplaceholder,
@@ -61569,10 +61572,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static bool constexpr isdescsort{helper::isdescsort<direction>};
 	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using W = helper::tounifunsigned<std::remove_pointer_t<T>, isabsvalue, issignmode, isfltpmode>;
-	using U = std::conditional_t<std::is_const_v<V> && std::is_volatile_v<V>, const volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
-		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
-		std::conditional_t<std::is_volatile_v<V>, volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
-		helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
+	using U = std::conditional_t<std::is_const_v<V> && std::is_volatile_v<V>, const volatile memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
+		std::conditional_t<std::is_const_v<V>, const memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
+		std::conditional_t<std::is_volatile_v<V>, volatile memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
+		memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
 	helper::radixsortnoallocmulti<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count,
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		allowedthreads, pfuturesplaceholder,
@@ -61606,10 +61609,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *RSBD8_R
 	static bool constexpr isdescsort{helper::isdescsort<direction>};
 	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using W = helper::tounifunsigned<std::remove_pointer_t<T>, isabsvalue, issignmode, isfltpmode>;
-	using U = std::conditional_t<std::is_const_v<V> && std::is_volatile_v<V>, const volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
-		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
-		std::conditional_t<std::is_volatile_v<V>, volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
-		helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
+	using U = std::conditional_t<std::is_const_v<V> && std::is_volatile_v<V>, const volatile memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
+		std::conditional_t<std::is_const_v<V>, const memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
+		std::conditional_t<std::is_volatile_v<V>, volatile memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
+		memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
 	helper::radixsortcopynoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count,
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		allowedthreads, pfuturesplaceholder,
@@ -61668,10 +61671,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 	static bool constexpr isdescsort{helper::isdescsort<direction>};
 	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using W = helper::tounifunsigned<std::remove_pointer_t<T>, isabsvalue, issignmode, isfltpmode>;
-	using U = std::conditional_t<std::is_const_v<V> && std::is_volatile_v<V>, const volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
-		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
-		std::conditional_t<std::is_volatile_v<V>, volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
-		helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
+	using U = std::conditional_t<std::is_const_v<V> && std::is_volatile_v<V>, const volatile memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
+		std::conditional_t<std::is_const_v<V>, const memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
+		std::conditional_t<std::is_volatile_v<V>, volatile memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
+		memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
 	helper::radixsortnoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count,
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		allowedthreads, pfuturesplaceholder,
@@ -61701,10 +61704,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static bool constexpr isdescsort{helper::isdescsort<direction>};
 	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using W = helper::tounifunsigned<std::remove_pointer_t<T>, isabsvalue, issignmode, isfltpmode>;
-	using U = std::conditional_t<std::is_const_v<V> && std::is_volatile_v<V>, const volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
-		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
-		std::conditional_t<std::is_volatile_v<V>, volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
-		helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
+	using U = std::conditional_t<std::is_const_v<V> && std::is_volatile_v<V>, const volatile memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
+		std::conditional_t<std::is_const_v<V>, const memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
+		std::conditional_t<std::is_volatile_v<V>, volatile memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
+		memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
 	if(!movetobuffer) helper::radixsortnoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count,
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		allowedthreads, pfuturesplaceholder,

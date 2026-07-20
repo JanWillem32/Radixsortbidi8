@@ -28,6 +28,9 @@ See "Performance tests" for more details about array sizes, types and achievable
 ### Compiler configuration block:
 - Per-compiler function attributes
 - Include statements and the last checks for compatibility
+- Utilities to create an immediate member object pointer for the type and offset indirection wrapper functions
+- Definition of the GetOffsetOf and getoffsetof templates
+- Apply compiler- and platform-specific intrinsic functions headers
 ### Internal functions implementation block (rsbd8::helper namespace):
 - Utilities for multithreaded concurrency
 - Utilities for general purpose register count compile-time detection
@@ -36,7 +39,6 @@ See "Performance tests" for more details about array sizes, types and achievable
 - Utilities to calculate sorting loop counts and offsets lengths
 - Utilities for endianess compile-time detection
 - Utilities to provide piecewise support and tests for 64- or 128-bit types
-- Utilities to create an immediate member object pointer for the type and offset indirection wrapper functions
 - Utilities to call the user-provided getter functions
 - Utilities to split off the first parameter
 - Utilities to retrieve the data sources from user-provided classes
@@ -79,7 +81,6 @@ See "Performance tests" for more details about array sizes, types and achievable
 - Up to 8-way multithreading functions with indirection
 - Up to 16-way multithreading functions with indirection
 ### User-facing (inline) functions block (rsbd8 namespace):
-- Definition of the GetOffsetOf and getoffsetof templates
 - Generic large array allocation and deallocation functions
 - Wrapper template functions for the main sorting functions in this library
 ### Ending:
