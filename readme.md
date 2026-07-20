@@ -105,12 +105,12 @@ For the more advanced use cases, an extra argument (run-time, variadic function 
 These index parameters are typically used in a more straightforward manner and use regular indexing.
 The variant with a getter function allows any number of extra arguments to pass on to the getter function.
 Using a getter function that can throw (meaning that it lacks "noexcept") will incur some extra processing overhead.
-Multithreading can be limited at compile-time by setting the macro RSBD8_THREAD_MAXIMUM to 1, 2, 4, 6, 8 or 16 simultaneous threads.
+Multithreading can be limited at compile-time by setting the macro RSBD8_THREAD_MAXIMUM to a set number of simultaneous threads, but this is only intended for debugging and temporary performance tuning.
 The exclusive single-threaded mode for the entire library is enabled by setting the macro RSBD8_THREAD_MAXIMUM to 1.
 There is no multithreading limit by default, but when multithreading is enabled, rsbd8::radixsort() and rsbd8::radixsortcopy() will query std::thread::hardware_concurrency() to set up that limit.
 This library does not automatically cross a NUMA node boundary, and it is up to the user to set up the environment for that if desired.
 This library does have merging functions to make processing across NUMA nodes feasible, but it is not implemented in the main sorting functions.
-Limits for multithreading based on the input count can be partially disabled at compile-time by setting the macro RSBD8_THREAD_MINIMUM to force using at least 2, 4, 6, 8 or 16 simultaneous threads.
+Limits for multithreading based on the input count can be partially disabled at compile-time by setting the macro RSBD8_THREAD_MINIMUM to force using a minimum number of simultaneous threads if technically possible, but this is only intended for debugging and temporary performance tuning.
 This is again not enabled by default. The much lower limits for allowing multithreading at runtime at the the absolute minimum input count for the implemented multithreading functions always apply.
 
 ```C++
