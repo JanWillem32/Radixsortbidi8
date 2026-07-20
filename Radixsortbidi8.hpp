@@ -651,6 +651,8 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 // __has_cpp_attribute(maybe_unused)
 #endif
 
+namespace rsbd8{
+
 // Utilities to create an immediate member object pointer for the type and offset indirection wrapper functions
 
 #pragma pack(push, 1)
@@ -718,6 +720,8 @@ struct memberptrsplitter{
 
 template<auto memberptr>
 constexpr std::size_t getoffsetof{OffsetHelper<memberptr, typename memberptrsplitter<memberptr>::classtype, 0u, sizeof(typename memberptrsplitter<memberptr>::classtype)>::GetOffsetOf()};
+
+}// namespace rsbd8
 
 // Apply compiler- and platform-specific intrinsic functions headers
 //
