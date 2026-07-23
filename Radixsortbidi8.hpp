@@ -13656,7 +13656,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps
+	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps, with -runsteps matching the first spinlock key inside the loop
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	if(offsetsloopcount<T> - 2u == shifter)RSBD8_UNLIKELY goto handlebelowtop;// rare, but possible
@@ -13691,7 +13691,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrchi = pdst;
-		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
+		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 		pdst = pdstnext;
 		pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 		psrchi += count;
@@ -13774,7 +13774,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
+			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 			pdst = pdstnext;
 			pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 			psrchi += count;
@@ -13845,7 +13845,7 @@ handlebelowtop:
 #endif
 				{
 					if(1u == runsteps)RSBD8_UNLIKELY return;
-					std::uintptr_t old{atomiclightbarrier.fetch_add(runsteps)};
+					std::uintptr_t old{atomiclightbarrier.fetch_add(runsteps)};// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 					// swap the pointers for the next round, data is moved on each iteration
 					psrchi = pdst;
 					pdst = pdstnext;
@@ -13941,7 +13941,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps
+	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps, with runsteps matching the first spinlock key inside the loop
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	if(offsetsloopcount<T> - 2u == shifter)RSBD8_UNLIKELY goto handlebelowtop;// rare, but possible
@@ -14017,7 +14017,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrclo = pdst;
-		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
+		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 		pdst = pdstnext;
 		pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
@@ -14164,7 +14164,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrclo = pdst;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 			pdst = pdstnext;
 			pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
@@ -14327,7 +14327,7 @@ handlebelowtop:
 				}
 				RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
 				if(1u == runsteps)RSBD8_UNLIKELY return;
-				if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
+				if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 				// swap the pointers for the next round, data is moved on each iteration
 				psrclo = pdst;
 				pdst = pdstnext;
@@ -16172,7 +16172,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps
+	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps, with -runsteps matching the first spinlock key inside the loop
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	if(offsetsloopcount<T> - 2u == shifter)RSBD8_UNLIKELY goto handlebelowtop;// rare, but possible
@@ -16215,7 +16215,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrchi = pdst;
-		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
+		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 		pdst = pdstnext;
 		pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 		psrchi += count;
@@ -16320,7 +16320,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
+			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 			pdst = pdstnext;
 			pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 			psrchi += count;
@@ -16413,7 +16413,7 @@ handlebelowtop:
 #endif
 				{
 					if(1u == runsteps)RSBD8_UNLIKELY return;
-					std::uintptr_t old{atomiclightbarrier.fetch_add(runsteps)};
+					std::uintptr_t old{atomiclightbarrier.fetch_add(runsteps)};// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 					// swap the pointers for the next round, data is moved on each iteration
 					psrchi = pdst;
 					pdst = pdstnext;
@@ -16538,7 +16538,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps
+	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps, with runsteps matching the first spinlock key inside the loop
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	if(offsetsloopcount<T> - 2u == shifter)RSBD8_UNLIKELY goto handlebelowtop;// rare, but possible
@@ -16652,7 +16652,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrclo = pdst;
-		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
+		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 		pdst = pdstnext;
 		pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
@@ -16890,7 +16890,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrclo = pdst;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 			pdst = pdstnext;
 			pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
@@ -17131,7 +17131,7 @@ handlebelowtop:
 				{
 					RSBD8_MAYBE_UNUSED std::uintptr_t old, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps) & -static_cast<std::intptr_t>(usemultithread))};
 					if(1u == runsteps)RSBD8_UNLIKELY return;
-					if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
+					if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 					// swap the pointers for the next round, data is moved on each iteration
 					psrclo = pdst;
 					pdst = pdstnext;
@@ -19412,7 +19412,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps
+	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps, with -runsteps matching the first spinlock key inside the loop
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	while(64u > shifter)RSBD8_LIKELY{// low 64 bits
@@ -19444,7 +19444,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrchi = pdst;
-		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
+		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 		pdst = pdstnext;
 		pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 		psrchi += count;
@@ -19492,7 +19492,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
+			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 			pdst = pdstnext;
 			pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 			psrchi += count;
@@ -19563,7 +19563,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps
+	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps, with runsteps matching the first spinlock key inside the loop
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	while(64u > shifter)RSBD8_LIKELY{// low 64 bits
@@ -19634,7 +19634,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrclo = pdst;
-		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
+		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 		pdst = pdstnext;
 		pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
@@ -19718,7 +19718,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrclo = pdst;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 			pdst = pdstnext;
 			pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
@@ -21220,7 +21220,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps
+	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps, with -runsteps matching the first spinlock key inside the loop
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	while(64u > shifter)RSBD8_LIKELY{// low 64 bits
@@ -21274,7 +21274,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrchi = pdst;
-		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
+		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 		pdst = pdstnext;
 		pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 		psrchi += count;
@@ -21348,7 +21348,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
+			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 			pdst = pdstnext;
 			pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 			psrchi += count;
@@ -21447,7 +21447,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps
+	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps, with runsteps matching the first spinlock key inside the loop
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	while(64u > shifter)RSBD8_LIKELY{// low 64 bits
@@ -21596,7 +21596,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrclo = pdst;
-		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
+		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 		pdst = pdstnext;
 		pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
@@ -21764,7 +21764,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrclo = pdst;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 			pdst = pdstnext;
 			pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
@@ -23952,7 +23952,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps
+	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps, with -runsteps matching the first spinlock key inside the loop
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	while(32u > shifter)RSBD8_LIKELY{// low 32 bits
@@ -23997,7 +23997,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrchi = pdst;
-		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
+		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 		pdst = pdstnext;
 		pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 		psrchi += count;
@@ -24056,7 +24056,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
+			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 			pdst = pdstnext;
 			pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 			psrchi += count;
@@ -24140,7 +24140,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps
+	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps, with runsteps matching the first spinlock key inside the loop
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	while(32u > shifter)RSBD8_LIKELY{// low 32 bits
@@ -24224,7 +24224,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrclo = pdst;
-		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
+		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 		pdst = pdstnext;
 		pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
@@ -24321,7 +24321,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrclo = pdst;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 			pdst = pdstnext;
 			pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
@@ -26194,7 +26194,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps
+	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps, with -runsteps matching the first spinlock key inside the loop
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	while(32u > shifter)RSBD8_LIKELY{// low 32 bits
@@ -26275,7 +26275,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrchi = pdst;
-		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
+		std::uintptr_t old{atomiclightbarrier.fetch_add(key)};// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 		pdst = pdstnext;
 		pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 		psrchi += count;
@@ -26374,7 +26374,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
+			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 			pdst = pdstnext;
 			pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 			psrchi += count;
@@ -26500,7 +26500,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps
+	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps, with runsteps matching the first spinlock key inside the loop
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	while(32u > shifter)RSBD8_LIKELY{// low 32 bits
@@ -26691,7 +26691,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		poffset += 1u << typeradix<T>;
 		// swap the pointers for the next round, data is moved on each iteration
 		psrclo = pdst;
-		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
+		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 		pdst = pdstnext;
 		pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
@@ -26901,7 +26901,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrclo = pdst;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 			pdst = pdstnext;
 			pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
@@ -31611,7 +31611,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps
+	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps, with -runsteps matching the first spinlock key inside the loop
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	if constexpr(!isabsvalue && isfltpmode) if(offsetsloopcount<T> - 1u <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
@@ -31660,7 +31660,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
+			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 			pdst = pdstnext;
 			pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 			psrchi += count;
@@ -31741,7 +31741,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps
+	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps, with runsteps matching the first spinlock key inside the loop
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	if constexpr(!isabsvalue && isfltpmode) if(offsetsloopcount<T> - 1u <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
@@ -31829,7 +31829,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrclo = pdst;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 			pdst = pdstnext;
 			pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
@@ -39674,7 +39674,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps
+	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps, with -runsteps matching the first spinlock key inside the loop
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	if constexpr(!isabsvalue && isfltpmode) if(offsetsloopcount<T> - 1u <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
@@ -39759,7 +39759,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};
+			std::uintptr_t old{atomiclightbarrier.fetch_add(key)};// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 			pdst = pdstnext;
 			pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 			psrchi += count;
@@ -39879,7 +39879,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps
+	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps, with runsteps matching the first spinlock key inside the loop
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
 	if constexpr(!isabsvalue && isfltpmode) if(offsetsloopcount<T> - 1u <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
@@ -40074,7 +40074,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			poffset += 1u << typeradix<T>;
 			// swap the pointers for the next round, data is moved on each iteration
 			psrclo = pdst;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(key);// no ABA issue: the uniqueness of the key is supplied by the top set bit inside runsteps, which is shifted right every loop
 			pdst = pdstnext;
 			pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
