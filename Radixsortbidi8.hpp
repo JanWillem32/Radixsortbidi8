@@ -12070,7 +12070,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 			do RSBD8_LIKELY{
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
-				U difference{t[1 - isdescsort * 2]};
+				difference = t[1 - isdescsort * 2];
 				*t = static_cast<X>(offset);
 				if constexpr(isdescsort){
 					prefetchbackward(t - 1);
@@ -12102,7 +12102,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 			offset += difference;
 			addcarryofless(b, static_cast<U>(count), difference);
 			*t = static_cast<X>(offset);
-			addcarryofless(b, static_cast<U>(count), t[1 - isdescsort * 2]);
+			addcarryofless(b, static_cast<U>(count), static_cast<U>(t[1 - isdescsort * 2]));
 			t[1 - isdescsort * 2] = static_cast<X>(count);// the last offset always starts at the end
 		}else{// unsigned or signed absolute
 			if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
@@ -12133,7 +12133,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 				t[1 - isdescsort * 2] = static_cast<X>(offset);
-				addcarryofless(b, static_cast<U>(count), *t);
+				addcarryofless(b, static_cast<U>(count), static_cast<U>(*t));
 				*t = static_cast<X>(count);// the last offset always starts at the end
 			}else{// all other modes
 				U difference{t[1 - isdescsort * 2]};
@@ -12156,7 +12156,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 				*t = static_cast<X>(offset);
-				addcarryofless(b, static_cast<U>(count), t[1 - isdescsort * 2]);
+				addcarryofless(b, static_cast<U>(count), static_cast<U>(t[1 - isdescsort * 2]));
 				t[1 - isdescsort * 2] = static_cast<X>(count);// the last offset always starts at the end
 			}
 		}
@@ -12355,7 +12355,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 				}while(--j);
 			}
 		}
-		addcarryofless(b, static_cast<U>(count), *t);
+		addcarryofless(b, static_cast<U>(count), static_cast<U>(*t));
 		*t = static_cast<X>(count);// the last offset always starts at the end
 		t[offsetshiftcount] = static_cast<X>(offset);
 		// again, adjust for the special mode
@@ -13656,9 +13656,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps, with -runsteps matching the first spinlock key inside the loop
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+	{// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+		std::uintptr_t old{atomiclightbarrier.load(std::memory_order_relaxed)}, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps))};
+		while(old && key != old){// continue if it's zero or -runsteps, with -runsteps matching the first spinlock key inside the loop
+			spinpause();// catch up until the other thread releases the barrier
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}
+	}
 	if(offsetsloopcount<T> - 2u == shifter)RSBD8_UNLIKELY goto handlebelowtop;// rare, but possible
 	if(offsetsloopcount<T> - 2u < shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
@@ -13941,9 +13945,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps, with runsteps matching the first spinlock key inside the loop
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+	if constexpr(ismultithreadcapable){// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+		std::uintptr_t old{atomiclightbarrier.load(std::memory_order_relaxed)};
+		while(old && runsteps != old){// continue if it's zero or runsteps, with runsteps matching the first spinlock key inside the loop
+			spinpause();// catch up until the other thread releases the barrier
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}
+	}
 	if(offsetsloopcount<T> - 2u == shifter)RSBD8_UNLIKELY goto handlebelowtop;// rare, but possible
 	if(offsetsloopcount<T> - 2u < shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
@@ -16172,9 +16180,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps, with -runsteps matching the first spinlock key inside the loop
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+	{// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+		std::uintptr_t old{atomiclightbarrier.load(std::memory_order_relaxed)}, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps))};
+		while(old && key != old){// continue if it's zero or -runsteps, with -runsteps matching the first spinlock key inside the loop
+			spinpause();// catch up until the other thread releases the barrier
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}
+	}
 	if(offsetsloopcount<T> - 2u == shifter)RSBD8_UNLIKELY goto handlebelowtop;// rare, but possible
 	if(offsetsloopcount<T> - 2u < shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
@@ -16538,9 +16550,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps, with runsteps matching the first spinlock key inside the loop
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+	if constexpr(ismultithreadcapable){// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+		std::uintptr_t old{atomiclightbarrier.load(std::memory_order_relaxed)};
+		while(old && runsteps != old){// continue if it's zero or runsteps, with runsteps matching the first spinlock key inside the loop
+			spinpause();// catch up until the other thread releases the barrier
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}
+	}
 	if(offsetsloopcount<T> - 2u == shifter)RSBD8_UNLIKELY goto handlebelowtop;// rare, but possible
 	if(offsetsloopcount<T> - 2u < shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
@@ -19412,9 +19428,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps, with -runsteps matching the first spinlock key inside the loop
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+	{// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+		std::uintptr_t old{atomiclightbarrier.load(std::memory_order_relaxed)}, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps))};
+		while(old && key != old){// continue if it's zero or -runsteps, with -runsteps matching the first spinlock key inside the loop
+			spinpause();// catch up until the other thread releases the barrier
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}
+	}
 	while(64u > shifter)RSBD8_LIKELY{// low 64 bits
 		static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 		// architecture: limit to four at a time when there's a decent amount of registers
@@ -19563,9 +19583,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps, with runsteps matching the first spinlock key inside the loop
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+	if constexpr(ismultithreadcapable){// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+		std::uintptr_t old{atomiclightbarrier.load(std::memory_order_relaxed)};
+		while(old && runsteps != old){// continue if it's zero or runsteps, with runsteps matching the first spinlock key inside the loop
+			spinpause();// catch up until the other thread releases the barrier
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}
+	}
 	while(64u > shifter)RSBD8_LIKELY{// low 64 bits
 		if constexpr(ismultithreadcapable){
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
@@ -21220,9 +21244,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps, with -runsteps matching the first spinlock key inside the loop
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+	{// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+		std::uintptr_t old{atomiclightbarrier.load(std::memory_order_relaxed)}, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps))};
+		while(old && key != old){// continue if it's zero or -runsteps, with -runsteps matching the first spinlock key inside the loop
+			spinpause();// catch up until the other thread releases the barrier
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}
+	}
 	while(64u > shifter)RSBD8_LIKELY{// low 64 bits
 		static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 		// architecture: limit to four at a time when there's a decent amount of registers
@@ -21447,9 +21475,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps, with runsteps matching the first spinlock key inside the loop
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+	if constexpr(ismultithreadcapable){// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+		std::uintptr_t old{atomiclightbarrier.load(std::memory_order_relaxed)};
+		while(old && runsteps != old){// continue if it's zero or runsteps, with runsteps matching the first spinlock key inside the loop
+			spinpause();// catch up until the other thread releases the barrier
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}
+	}
 	while(64u > shifter)RSBD8_LIKELY{// low 64 bits
 		if constexpr(ismultithreadcapable){
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
@@ -23952,9 +23984,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps, with -runsteps matching the first spinlock key inside the loop
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+	{// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+		std::uintptr_t old{atomiclightbarrier.load(std::memory_order_relaxed)}, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps))};
+		while(old && key != old){// continue if it's zero or -runsteps, with -runsteps matching the first spinlock key inside the loop
+			spinpause();// catch up until the other thread releases the barrier
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}
+	}
 	while(32u > shifter)RSBD8_LIKELY{// low 32 bits
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
@@ -24140,9 +24176,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps, with runsteps matching the first spinlock key inside the loop
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+	if constexpr(ismultithreadcapable){// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+		std::uintptr_t old{atomiclightbarrier.load(std::memory_order_relaxed)};
+		while(old && runsteps != old){// continue if it's zero or runsteps, with runsteps matching the first spinlock key inside the loop
+			spinpause();// catch up until the other thread releases the barrier
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}
+	}
 	while(32u > shifter)RSBD8_LIKELY{// low 32 bits
 		if constexpr(ismultithreadcapable){
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
@@ -26194,9 +26234,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps, with -runsteps matching the first spinlock key inside the loop
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+	{// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+		std::uintptr_t old{atomiclightbarrier.load(std::memory_order_relaxed)}, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps))};
+		while(old && key != old){// continue if it's zero or -runsteps, with -runsteps matching the first spinlock key inside the loop
+			spinpause();// catch up until the other thread releases the barrier
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}
+	}
 	while(32u > shifter)RSBD8_LIKELY{// low 32 bits
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
@@ -26500,9 +26544,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
-	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps, with runsteps matching the first spinlock key inside the loop
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+	if constexpr(ismultithreadcapable){// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+		std::uintptr_t old{atomiclightbarrier.load(std::memory_order_relaxed)};
+		while(old && runsteps != old){// continue if it's zero or runsteps, with runsteps matching the first spinlock key inside the loop
+			spinpause();// catch up until the other thread releases the barrier
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}
+	}
 	while(32u > shifter)RSBD8_LIKELY{// low 32 bits
 		if constexpr(ismultithreadcapable){
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
@@ -31611,9 +31659,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps, with -runsteps matching the first spinlock key inside the loop
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+	{// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+		std::uintptr_t old{atomiclightbarrier.load(std::memory_order_relaxed)}, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps))};
+		while(old && key != old){// continue if it's zero or -runsteps, with -runsteps matching the first spinlock key inside the loop
+			spinpause();// catch up until the other thread releases the barrier
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}
+	}
 	if constexpr(!isabsvalue && isfltpmode) if(offsetsloopcount<T> - 1u <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
 	for(;;){
@@ -31741,9 +31793,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps, with runsteps matching the first spinlock key inside the loop
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+	if constexpr(ismultithreadcapable){// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+		std::uintptr_t old{atomiclightbarrier.load(std::memory_order_relaxed)};
+		while(old && runsteps != old){// continue if it's zero or runsteps, with runsteps matching the first spinlock key inside the loop
+			spinpause();// catch up until the other thread releases the barrier
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}
+	}
 	if constexpr(!isabsvalue && isfltpmode) if(offsetsloopcount<T> - 1u <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
 	for(;;){
@@ -38751,7 +38807,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						poutputlo += 3;
 						U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 						U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
-						U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
+						U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imf, varparameters...)};
 						if constexpr(prefetchmaxstride){
 							prefetchcurrent<indirection1>(pnd);
 							prefetchcurrent<indirection1>(pne);
@@ -39179,7 +39235,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						poutputlo += 3;
 						U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 						U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
-						U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
+						U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imf, varparameters...)};
 						if constexpr(prefetchmaxstride){
 							prefetchcurrent<indirection1>(pnd);
 							prefetchcurrent<indirection1>(pne);
@@ -39674,9 +39730,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	while(runsteps < runsteps + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -runsteps, with -runsteps matching the first spinlock key inside the loop
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+	{// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+		std::uintptr_t old{atomiclightbarrier.load(std::memory_order_relaxed)}, key{static_cast<std::uintptr_t>(-static_cast<std::intptr_t>(runsteps))};
+		while(old && key != old){// continue if it's zero or -runsteps, with -runsteps matching the first spinlock key inside the loop
+			spinpause();// catch up until the other thread releases the barrier
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}
+	}
 	if constexpr(!isabsvalue && isfltpmode) if(offsetsloopcount<T> - 1u <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
 	for(;;){
@@ -39879,9 +39939,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
-	if constexpr(ismultithreadcapable) while(runsteps <= atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or runsteps, with runsteps matching the first spinlock key inside the loop
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+	if constexpr(ismultithreadcapable){// do not place this inside the main loop, as the barrier is released there by cancelling runsteps and -runsteps in interlocked add-fetch operations
+		std::uintptr_t old{atomiclightbarrier.load(std::memory_order_relaxed)};
+		while(old && runsteps != old){// continue if it's zero or runsteps, with runsteps matching the first spinlock key inside the loop
+			spinpause();// catch up until the other thread releases the barrier
+			old = atomiclightbarrier.load(std::memory_order_relaxed);
+		}
+	}
 	if constexpr(!isabsvalue && isfltpmode) if(offsetsloopcount<T> - 1u <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
 	for(;;){
@@ -46667,7 +46731,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								pbufferlo += 3;
 								U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 								U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
-								U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
+								U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imf, varparameters...)};
 								prefetchcurrent<indirection1>(pnd);
 								prefetchcurrent<indirection1>(pne);
 								prefetchcurrent<indirection1>(pnf);
@@ -46762,7 +46826,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								pbufferlo += 3;
 								U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 								U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
-								U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
+								U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imf, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curd, cure, curf);
 								}
@@ -47356,7 +47420,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								pbufferlo += 3;
 								U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 								U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
-								U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
+								U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imf, varparameters...)};
 								prefetchcurrent<indirection1>(pnd);
 								prefetchcurrent<indirection1>(pne);
 								prefetchcurrent<indirection1>(pnf);
@@ -47451,7 +47515,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								pbufferlo += 3;
 								U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 								U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
-								U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
+								U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imf, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curd, cure, curf);
 								}
@@ -48505,7 +48569,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pfill -= length;
 				std::memset(pfill, static_cast<signed>(filler), length);
 				length = static_cast<U>(*t) + static_cast<U>(t[offsetspivot]);
-				filler += static_cast<unsigned>(isdescsort * 2 - 1);
+				filler += isdescsort * 2u - 1u;
 				if constexpr(isdescsort){
 					prefetchforward(t + 1);
 					prefetchforward(t + offsetspivot + 1);
@@ -48555,7 +48619,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					pfill -= length;
 					std::memset(pfill, static_cast<signed>(filler), length);
 					length = static_cast<U>(*t) + static_cast<U>(t[offsetspivot]);
-					filler += static_cast<unsigned>(isdescsort * 2 - 1);
+					filler += isdescsort * 2u - 1u;
 					if constexpr(isdescsort){
 						prefetchforward(t + 1);
 						prefetchforward(t + offsetspivot + 1);
@@ -48822,14 +48886,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::memset(pfill, static_cast<signed>(filler), length);
 			pfill += length;
 			length = t[(isdescsort * 2 - 1) << 8];
-			filler += 1 - isdescsort * 2;// only 8 bits are used
+			filler += 1u - isdescsort * 2u;// only 8 bits are used
 			t += ((1 << typebitsize<T>) - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			j = (1u << (typebitsize<T> - 1u)) - 1u;
 			do RSBD8_LIKELY{
 				std::memset(pfill, static_cast<signed>(filler), length);
 				pfill += length;
 				length = *t;
-				filler += 1 - isdescsort * 2;
+				filler += 1u - isdescsort * 2u;
 				if constexpr(isdescsort){
 					prefetchbackward(t - 1);
 					--t;
