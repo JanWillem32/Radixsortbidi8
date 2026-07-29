@@ -10,7 +10,7 @@
 #include <tlhelp32.h>
 #include <cmath>
 
-// This test suite and the library header allows some configuration with macros.
+// This test suite and the library header allows some configuration with a few constants and macros.
 // The library itself does not require any of its macros to be defined for normal operation.
 // the test batch sizes for the performance tests (8 GiB as the only entry in the array by default)
 // suggestions, all powers of 2 minus one except for the last item, to make sure most sorts of count leftover paths are touched inside the functions:
@@ -27,10 +27,12 @@
 //static std::size_t constexpr RSBD8_TEST_BATCH_SIZE[]{176uz * 1024, 184uz * 1024, 192uz * 1024, 200uz * 1024, 208uz * 1024, 216uz * 1024, 224uz * 1024, 232uz * 1024, 240uz * 1024, 248uz * 1024, 256uz * 1024, 264uz * 1024, 272uz * 1024, 280uz * 1024, 288uz * 1024, 296uz * 1024, 304uz * 1024, 312uz * 1024, 320uz * 1024, 328uz * 1024, 336uz * 1024, 344uz * 1024, 352uz * 1024, 360uz * 1024, 368uz * 1024, 376uz * 1024, 384uz * 1024, 392uz * 1024, 400uz * 1024};
 // the three default tests of 8 KiB, 8 MiB and 8 GiB
 static std::size_t constexpr RSBD8_TEST_BATCH_SIZE[]{8uz * 1024 * 1024 * 1024, 8uz * 1024 * 1024, 8uz * 1024};
+// the entire benchmarks for any of the two radix sort versions can be put into descending sort and reversed order mode
+//#define RSBD8_BENCHMARK_FULL_REVERSE
 // the entire benchmarks for the external std::sort() and std::stable_sort() functions can be disabled
-#ifdef _DEBUG// skip in debug builds by default to save a lot of time on these slow functions, and don't waste resources on unnecessary tests
+#if defined(_DEBUG) || defined(RSBD8_BENCHMARK_FULL_REVERSE)// skip in debug and full reverse sorting builds by default to not waste resources on unnecessary tests
 #define RSBD8_DISABLE_BENCHMARK_EXTERNAL
-#endif// _DEBUG
+#endif
 // the entire benchmarks for the copy version of the radix sort can be disabled to further reduce the test time
 #define RSBD8_DISABLE_BENCHMARK_COPYVERSION
 // the entire benchmarks for unsigned kinds of the radix sort can be disabled to further reduce the test time
@@ -868,7 +870,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -891,7 +897,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -910,7 +922,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -933,7 +949,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -954,7 +976,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -977,7 +1003,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -996,7 +1028,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1019,7 +1055,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -1040,7 +1082,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1065,7 +1111,13 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::longdoubletest128<false, true, true>>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -1085,7 +1137,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1110,7 +1166,13 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::longdoubletest128<false, true, true>>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -1133,7 +1195,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, false, false> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, false, false> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1156,7 +1222,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -1175,7 +1247,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, false, false> const *>(in), reinterpret_cast<rsbd8::helper::test128<false, false, false> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, false, false> const *>(in), reinterpret_cast<rsbd8::helper::test128<false, false, false> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1198,7 +1274,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -1219,7 +1301,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, true, false> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, true, false> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1242,7 +1328,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -1261,7 +1353,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, true, false> const *>(in), reinterpret_cast<rsbd8::helper::test128<false, true, false> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, true, false> const *>(in), reinterpret_cast<rsbd8::helper::test128<false, true, false> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1284,7 +1380,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -1305,7 +1407,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, true, true> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, true, true> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1330,7 +1436,13 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::test128<false, true, true>>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -1350,7 +1462,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(in), reinterpret_cast<rsbd8::helper::test128<false, true, true> *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(in), reinterpret_cast<rsbd8::helper::test128<false, true, true> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1375,7 +1491,13 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::test128<false, true, true>>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -1456,7 +1578,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(currentbatchsize / 8, reinterpret_cast<std::uint64_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 8, reinterpret_cast<std::uint64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1479,7 +1605,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -1498,7 +1630,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy(currentbatchsize / 8, reinterpret_cast<std::uint64_t const *>(in), reinterpret_cast<std::uint64_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 8, reinterpret_cast<std::uint64_t const *>(in), reinterpret_cast<std::uint64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1521,7 +1657,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -1600,7 +1742,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(currentbatchsize / 8, reinterpret_cast<std::int64_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 8, reinterpret_cast<std::int64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1623,7 +1769,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -1642,7 +1794,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy(currentbatchsize / 8, reinterpret_cast<std::int64_t const *>(in), reinterpret_cast<std::int64_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 8, reinterpret_cast<std::int64_t const *>(in), reinterpret_cast<std::int64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1665,7 +1821,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -1716,7 +1878,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(currentbatchsize / 8, reinterpret_cast<double *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 8, reinterpret_cast<double *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1741,7 +1907,13 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint64_t>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -1761,7 +1933,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy(currentbatchsize / 8, reinterpret_cast<double const *>(in), reinterpret_cast<double *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 8, reinterpret_cast<double const *>(in), reinterpret_cast<double *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1786,7 +1962,13 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint64_t>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -1866,7 +2048,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(currentbatchsize / 4, reinterpret_cast<std::uint32_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 4, reinterpret_cast<std::uint32_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1889,7 +2075,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -1908,7 +2100,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy(currentbatchsize / 4, reinterpret_cast<std::uint32_t const *>(in), reinterpret_cast<std::uint32_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 4, reinterpret_cast<std::uint32_t const *>(in), reinterpret_cast<std::uint32_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1931,7 +2127,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -2010,7 +2212,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(currentbatchsize / 4, reinterpret_cast<std::int32_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 4, reinterpret_cast<std::int32_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2033,7 +2239,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -2052,7 +2264,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy(currentbatchsize / 4, reinterpret_cast<std::int32_t const *>(in), reinterpret_cast<std::int32_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 4, reinterpret_cast<std::int32_t const *>(in), reinterpret_cast<std::int32_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2075,7 +2291,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -2126,7 +2348,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(currentbatchsize / 4, reinterpret_cast<float *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 4, reinterpret_cast<float *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2151,7 +2377,13 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -2171,7 +2403,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy(currentbatchsize / 4, reinterpret_cast<float const *>(in), reinterpret_cast<float *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 4, reinterpret_cast<float const *>(in), reinterpret_cast<float *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2196,7 +2432,13 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -2276,7 +2518,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(currentbatchsize / 2, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 2, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2299,7 +2545,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -2318,7 +2570,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy(currentbatchsize / 2, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 2, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2341,7 +2597,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -2420,7 +2682,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(currentbatchsize / 2, reinterpret_cast<std::int16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 2, reinterpret_cast<std::int16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2443,7 +2709,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -2462,7 +2734,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy(currentbatchsize / 2, reinterpret_cast<std::int16_t const *>(in), reinterpret_cast<std::int16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize / 2, reinterpret_cast<std::int16_t const *>(in), reinterpret_cast<std::int16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2485,7 +2761,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -2506,7 +2788,13 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(currentbatchsize / 2, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort<
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			rsbd8::sortingdirection::dscrevorder
+#else
+			rsbd8::sortingdirection::ascfwdorder
+#endif
+			, rsbd8::sortingmode::forcefloatingp>(currentbatchsize / 2, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2531,7 +2819,13 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -2551,7 +2845,13 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(currentbatchsize / 2, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy<
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			rsbd8::sortingdirection::dscrevorder
+#else
+			rsbd8::sortingdirection::ascfwdorder
+#endif
+			, rsbd8::sortingmode::forcefloatingp>(currentbatchsize / 2, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2576,7 +2876,13 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -2656,7 +2962,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(currentbatchsize, reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize, reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2679,7 +2989,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -2698,7 +3014,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy(currentbatchsize, reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize, reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2721,7 +3041,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -2800,7 +3126,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(currentbatchsize, reinterpret_cast<std::int8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize, reinterpret_cast<std::int8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2823,7 +3153,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -2842,7 +3178,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy(currentbatchsize, reinterpret_cast<std::int8_t const *>(in), reinterpret_cast<std::int8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(currentbatchsize, reinterpret_cast<std::int8_t const *>(in), reinterpret_cast<std::int8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2865,7 +3205,13 @@ repeattest:
 		auto curlo{*piter++};
 		do{
 			auto curhi{*piter++};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			curlo = curhi;
 		}while(--k);
@@ -2873,6 +3219,10 @@ repeattest:
 #endif// _DEBUG
 #endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
 #endif// not RSBD8_DISABLE_BENCHMARK_SIGNED
+
+
+
+
 #ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2886,7 +3236,13 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(currentbatchsize, reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort<
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			rsbd8::sortingdirection::dscrevorder
+#else
+			rsbd8::sortingdirection::ascfwdorder
+#endif
+			, rsbd8::sortingmode::forcefloatingp>(currentbatchsize, reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2911,7 +3267,13 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -2931,7 +3293,13 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(currentbatchsize, reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy<
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			rsbd8::sortingdirection::dscrevorder
+#else
+			rsbd8::sortingdirection::ascfwdorder
+#endif
+			, rsbd8::sortingmode::forcefloatingp>(currentbatchsize, reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2956,7 +3324,13 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -2987,7 +3361,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> **>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(testsize, reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> **>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3013,8 +3391,20 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{*hi};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(curhi == curlo &&
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				lo <= hi
+#else
+				hi <= lo
+#endif
+				) __debugbreak();// break on error, this verifies the results are also ordered correctly
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -3042,7 +3432,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> **>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(testsize, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> **>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3068,8 +3462,20 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::longdoubletest128<false, true, true>>(*hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(curhi == curlo &&
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				lo <= hi
+#else
+				hi <= lo
+#endif
+				) __debugbreak();// break on error, this verifies the results are also ordered correctly
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -3098,7 +3504,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<rsbd8::helper::test128<false, false, false> **>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(testsize, reinterpret_cast<rsbd8::helper::test128<false, false, false> **>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3124,8 +3534,20 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{*hi};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(curhi == curlo &&
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				lo <= hi
+#else
+				hi <= lo
+#endif
+				) __debugbreak();// break on error, this verifies the results are also ordered correctly
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -3153,7 +3575,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<rsbd8::helper::test128<false, true, true> **>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(testsize, reinterpret_cast<rsbd8::helper::test128<false, true, true> **>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3179,8 +3605,20 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::test128<false, true, true>>(*hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(curhi == curlo &&
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				lo <= hi
+#else
+				hi <= lo
+#endif
+				) __debugbreak();// break on error, this verifies the results are also ordered correctly
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -3247,7 +3685,11 @@ repeattest:
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<std::uint64_t **>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(testsize, reinterpret_cast<std::uint64_t **>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64wstop;
@@ -3273,8 +3715,20 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{*hi};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(curhi == curlo &&
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				lo <= hi
+#else
+				hi <= lo
+#endif
+				) __debugbreak();// break on error, this verifies the results are also ordered correctly
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -3340,7 +3794,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<double **>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(testsize, reinterpret_cast<double **>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3366,8 +3824,20 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint64_t>(*hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(curhi == curlo &&
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				lo <= hi
+#else
+				hi <= lo
+#endif
+				) __debugbreak();// break on error, this verifies the results are also ordered correctly
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -3433,7 +3903,11 @@ repeattest:
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<std::uint32_t **>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(testsize, reinterpret_cast<std::uint32_t **>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64wstop;
@@ -3459,8 +3933,20 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{*hi};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(curhi == curlo &&
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				lo <= hi
+#else
+				hi <= lo
+#endif
+				) __debugbreak();// break on error, this verifies the results are also ordered correctly
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -3526,7 +4012,11 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<float **>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(testsize, reinterpret_cast<float **>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3552,8 +4042,20 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(*hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(curhi == curlo &&
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				lo <= hi
+#else
+				hi <= lo
+#endif
+				) __debugbreak();// break on error, this verifies the results are also ordered correctly
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -3619,7 +4121,11 @@ repeattest:
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<std::uint16_t **>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(testsize, reinterpret_cast<std::uint16_t **>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64wstop;
@@ -3645,8 +4151,20 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{*hi};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(curhi == curlo &&
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				lo <= hi
+#else
+				hi <= lo
+#endif
+				) __debugbreak();// break on error, this verifies the results are also ordered correctly
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -3674,7 +4192,13 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(testsize, reinterpret_cast<std::uint16_t **>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort<
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			rsbd8::sortingdirection::dscrevorder
+#else
+			rsbd8::sortingdirection::ascfwdorder
+#endif
+			, rsbd8::sortingmode::forcefloatingp>(testsize, reinterpret_cast<std::uint16_t **>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3700,8 +4224,20 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(*hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(curhi == curlo &&
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				lo <= hi
+#else
+				hi <= lo
+#endif
+				) __debugbreak();// break on error, this verifies the results are also ordered correctly
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -3767,7 +4303,11 @@ repeattest:
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<std::uint8_t **>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			<rsbd8::sortingdirection::dscrevorder>
+#endif
+			(testsize, reinterpret_cast<std::uint8_t **>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64wstop;
@@ -3793,8 +4333,20 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{*hi};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(curhi == curlo &&
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				lo <= hi
+#else
+				hi <= lo
+#endif
+				) __debugbreak();// break on error, this verifies the results are also ordered correctly
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
@@ -3822,7 +4374,13 @@ repeattest:
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(testsize, reinterpret_cast<std::uint8_t **>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort<
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+			rsbd8::sortingdirection::dscrevorder
+#else
+			rsbd8::sortingdirection::ascfwdorder
+#endif
+			, rsbd8::sortingmode::forcefloatingp>(testsize, reinterpret_cast<std::uint8_t **>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3848,8 +4406,20 @@ repeattest:
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(*hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
+			if(
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				curlo < curhi
+#else
+				curhi < curlo
+#endif
+				) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			if(curhi == curlo &&
+#ifdef RSBD8_BENCHMARK_FULL_REVERSE
+				lo <= hi
+#else
+				hi <= lo
+#endif
+				) __debugbreak();// break on error, this verifies the results are also ordered correctly
 			// shift up by one
 			lo = hi;
 			curlo = curhi;
