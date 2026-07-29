@@ -48586,7 +48586,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pfill -= length;
 				std::memset(pfill, static_cast<signed>(filler), length);
 				length = static_cast<U>(*t) + static_cast<U>(t[offsetspivot]);
-				filler += isdescsort * 2u - 1u;
+				filler += static_cast<unsigned>(isdescsort * 2 - 1);
 				if constexpr(isdescsort){
 					prefetchforward(t + 1);
 					prefetchforward(t + offsetspivot + 1);
@@ -48636,7 +48636,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					pfill -= length;
 					std::memset(pfill, static_cast<signed>(filler), length);
 					length = static_cast<U>(*t) + static_cast<U>(t[offsetspivot]);
-					filler += isdescsort * 2u - 1u;
+					filler += static_cast<unsigned>(isdescsort * 2 - 1);
 					if constexpr(isdescsort){
 						prefetchforward(t + 1);
 						prefetchforward(t + offsetspivot + 1);
@@ -48813,7 +48813,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					std::memset(pfill, static_cast<signed>(filler), length);
 					pfill += length;
 					length = static_cast<U>(*t) + static_cast<U>(t[offsetspivot]);
-					filler += 1u - isdescsort * 2u;
+					filler += static_cast<unsigned>(1 - isdescsort * 2);
 					if constexpr(isdescsort){
 						prefetchbackward(t - 1);
 						prefetchbackward(t + offsetspivot - 1);
@@ -48863,7 +48863,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						std::memset(pfill, static_cast<signed>(filler), length);
 						pfill += length;
 						length = static_cast<U>(*t) + static_cast<U>(t[offsetspivot]);
-						filler += 1u - isdescsort * 2u;
+						filler += static_cast<unsigned>(1 - isdescsort * 2);
 						if constexpr(isdescsort){
 							prefetchbackward(t - 1);
 							prefetchbackward(t + offsetspivot - 1);
@@ -48891,7 +48891,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				std::memset(pfill, static_cast<signed>(filler), length);
 				pfill += length;
 				length = *t;
-				filler += 1u - isdescsort * 2u;
+				filler += static_cast<unsigned>(1 - isdescsort * 2);
 				if constexpr(isdescsort){
 					prefetchbackward(t - 1);
 					--t;
@@ -48903,14 +48903,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::memset(pfill, static_cast<signed>(filler), length);
 			pfill += length;
 			length = t[(isdescsort * 2 - 1) << 8];
-			filler += 1u - isdescsort * 2u;// only 8 bits are used
+			filler += static_cast<unsigned>(1 - isdescsort * 2);// only 8 bits are used
 			t += ((1 << typebitsize<T>) - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			j = (1u << (typebitsize<T> - 1u)) - 1u;
 			do RSBD8_LIKELY{
 				std::memset(pfill, static_cast<signed>(filler), length);
 				pfill += length;
 				length = *t;
-				filler += 1u - isdescsort * 2u;
+				filler += static_cast<unsigned>(1 - isdescsort * 2);
 				if constexpr(isdescsort){
 					prefetchbackward(t - 1);
 					--t;
@@ -48956,7 +48956,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					std::memset(pfill, static_cast<signed>(filler), length);
 					pfill += length;
 					length = *t;
-					filler += 1u - isdescsort * 2u;
+					filler += static_cast<unsigned>(1 - isdescsort * 2);
 					if constexpr(isdescsort){
 						prefetchbackward(t - 1);
 						--t;
