@@ -3232,12 +3232,11 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 //
 // These are used for the multi-threaded loop initialisation, and are designed to be used in a way that allows the main thread to handle slice 0, and the supporting threads to handle slices 1 and above, with the ability to expand the main thread's slice range if threads failed to spawn.
 // In essence, these functions determine the slice size and location for each thread.
-// The version for the main thread is different from the general version.
-// It starts at slice 0, but allows expansion to higher slices as a range from 0 to unsigned unassignedslices if threads failed to spawn.
-// It also has a std::ptrdiff_t i item count return, which is to be iterated down to zero inclusive.
-// The general version has a std::size_t i item count return, which is to be iterated down to zero exclusive, and can only handle one slice at a time.
-// If a std::size_t loc pointer offset is returned, it is to be added to the array start/end pointer(s) for the loops.
-// The initmtsliceswaps* versions are for reversing loops only, and require an even itemsperloop parameter.
+// The two versions for the main thread are different from the other two.
+// These starts at slice 0, but allows expansion to higher slices as a range from 0 to unsigned unassignedslices if threads failed to spawn.
+// The initmtslicemain() and initmtslicemt() functions are for forward ordered methods.
+// The initmtsliceswapsmain() and initmtsliceswapsmt() functions are reversing ordered methods. (These are only applied where reversed ordered versions makes sense.)
+// The data returned from each of the four versions is different, and adapted for optimal use. See each function for the return statement at the end.
 
 template<unsigned itemsperloop>
 RSBD8_NODISCARD RSBD8_FUNC_INLINE std::ptrdiff_t initmtslicemain(std::size_t count, unsigned allowedthreads, unsigned unassignedslices)noexcept{
@@ -3246,7 +3245,6 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::ptrdiff_t initmtslicemain(std::size_t cou
 	assert(allowedthreads);
 	assert(1u < count);
 	// the item count is rounded down in the lower set of threads, and rounded up in the upper set of threads
-	// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
 	std::size_t i{count + 1u};
 	if constexpr(1u < itemsperloop){
 		std::size_t rem{i % itemsperloop};
@@ -3257,8 +3255,9 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::ptrdiff_t initmtslicemain(std::size_t cou
 		if(slicerem < slicesother) slicerem = slicesother;
 		i += i * unassignedslices;// unassignedslices will usually be zero at this point
 		slicerem -= slicesother;
-		i += std::min(slicerem, unassignedslices);// only add on the remainder terms for this half
-		i = i * itemsperloop + rem;// include the final remainder term for outside of the loop in the next part
+		i += std::min(slicerem, unassignedslices);// only add on the remainder terms for this slice
+		i *= itemsperloop;
+		i += rem;// include the final remainder term for outside of the loop in the next part
 	}else{// single item per loop
 		unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
 		i /= allowedthreads;
@@ -3266,10 +3265,10 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::ptrdiff_t initmtslicemain(std::size_t cou
 		if(slicerem < slicesother) slicerem = slicesother;
 		i += i * unassignedslices;// unassignedslices will usually be zero at this point
 		slicerem -= slicesother;
-		i += std::min(slicerem, unassignedslices);// only add on the remainder terms for this half
+		i += std::min(slicerem, unassignedslices);// only add on the remainder terms for this slice
 	}
 	--i;
-	return{static_cast<std::ptrdiff_t>(i)};
+	return{static_cast<std::ptrdiff_t>(i)};// i is the signed item count minus one to simply iterate down to zero inclusive over the arrays
 }
 
 template<unsigned itemsperloop>
@@ -3280,7 +3279,6 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtslic
 	assert(allowedthreads);
 	assert(1u < count);
 	// the item count is rounded down in the lower set of threads, and rounded up in the upper set of threads
-	// the thread count is rounded up in the main thread, and rounded down in the companion thread
 	std::size_t i{count + 1u};
 	std::size_t loc;
 	if constexpr(1u < itemsperloop){
@@ -3293,9 +3291,10 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtslic
 		addcarryoflessorequal(i, allowedthreads, slicerem);
 		if(slicerem < allowedthreads) slicerem = allowedthreads;
 		loc -= allowedthreads;
-		i *= itemsperloop;
 		loc += slicerem;
-		loc = loc * itemsperloop + rem;// include the final remainder term of slice 0 (main)
+		i *= itemsperloop;
+		loc *= itemsperloop;
+		loc += rem;// include the final remainder term of slice 0 (main)
 	}else{// single item per loop
 		unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
 		i /= allowedthreads;
@@ -3306,7 +3305,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtslic
 		loc -= allowedthreads;
 		loc += slicerem;
 	}
-	return{i, loc};// signed loop counter, pointer relocation from the array start
+	return{i, loc};// i is an item count, not a loop count, paired with loc which is the pointer relocation from the array start
 }
 
 template<unsigned itemsperloop>
@@ -3317,21 +3316,20 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::size_t initmtsliceswapsmain(std::size_t c
 	assert(allowedthreads);
 	assert(1u < count);
 	// the item count is rounded down in the lower set of threads, and rounded up in the upper set of threads
-	// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
 	std::size_t i{count + 1u};
-	std::size_t loc{i >> 1};// determine the middle point, rounded up if even
+	std::size_t loc{i >> 1};// determine the middle point, rounded up using the the final remainder term
 	std::size_t rem{i % itemsperloop};
 	i /= itemsperloop;
+	unsigned slicesother{allowedthreads >> 1};
 	unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
 	i /= allowedthreads;
 	loc += rem;// include the final remainder term for outside of the loop in the next part
-	unsigned slicesother{allowedthreads >> 1};
 	if(slicerem < slicesother) slicerem = slicesother;
 	i += i * unassignedslices;// unassignedslices will usually be zero at this point
 	slicerem -= slicesother;
-	i += std::min(slicerem, unassignedslices);// only add on the remainder terms for this half
+	i += std::min(slicerem, unassignedslices);// only add on the remainder terms for this slice
 	loc += i * (itemsperloop >> 1);
-	return{loc};
+	return{loc};// loc is the pointer relocation from the array start
 }
 
 template<unsigned itemsperloop>
@@ -3343,21 +3341,22 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtslic
 	assert(allowedthreads);
 	assert(1u < count);
 	// the item count is rounded down in the lower set of threads, and rounded up in the upper set of threads
-	// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
 	std::size_t i{count + 1u};
-	std::size_t loc{i >> 1};// determine the middle point, rounded up if even
+	std::size_t baseloc{i >> 1};// determine the middle point, rounded up using the the final remainder term
 	std::size_t rem{i % itemsperloop};
 	i /= itemsperloop;
 	unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
 	i /= allowedthreads;
-	loc += rem;// include the final remainder term for outside of the loop in the next part
-	unsigned slicesother{allowedthreads >> 1};
-	if(slicerem < slicesother) slicerem = slicesother;
-	i += i * assignedslice;// assignedslice will usually be zero at this point
-	slicerem -= slicesother;
-	i += std::min(slicerem, assignedslice);// only add on the remainder terms for this half
-	loc += i * (itemsperloop >> 1);
-	return{i, loc};
+	allowedthreads -= assignedslice;
+	std::size_t loc{assignedslice * i};
+	addcarryoflessorequal(i, allowedthreads, slicerem);
+	if(slicerem < allowedthreads) slicerem = allowedthreads;
+	loc -= allowedthreads;
+	baseloc += rem;// include the final remainder term of slice 0 (main)
+	loc += slicerem;
+	loc *= itemsperloop >> 1;
+	loc += baseloc;// move to past the middle point
+	return{i, loc};// i is a loop count, not an item count, paired with loc which is the pointer relocation from the array start
 }
 
 // Utilities to implement the 8 combinations of absolute value, signed type and floating-point type sorting modes
@@ -9843,35 +9842,33 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least64_t curqa{static_cast<std::uint_least64_t>(curpa)};
 		std::int_least64_t curpb{static_cast<std::int_least64_t>(curhib)};
 		if constexpr(isfltpmode){
-			outa[0].data[HI] = curhia;
-			dsta[0].data[HI] = curhia;
-			curhia += curhia;
+			outb[0].data[HI] = curhib;
+			dstb[0].data[HI] = curhib;
+			curhib += curhib;
 		}else if constexpr(!issignmode){
-			outa[0].data[HI] = curhia;
-			dsta[0].data[HI] = curhia;
-			outa[0].data[LO] = curloa;
-			dsta[0].data[LO] = curloa;
+			outb[0].data[HI] = curhib;
+			dstb[0].data[HI] = curhib;
+			outb[0].data[LO] = curlob;
+			dstb[0].data[LO] = curlob;
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
-			static_assert(64u == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
-			unsigned long long carrymida, checkcarrya;
-			curloa = __builtin_addcll(curloa, curloa, 0u, &carrymida);
-			curhia = __builtin_addcll(curhia, curhia, carrymida, &checkcarrya);
+			unsigned long long carrymidb, checkcarryb;
+			curlob = __builtin_addcll(curlob, curlob, 0u, &carrymidb);
+			curhib = __builtin_addcll(curhib, curhib, carrymidb, &checkcarryb);
 #else
-			static_assert(64u == CHAR_BIT * sizeof(long), "unexpected size of type long");
-			unsigned long carrymida, checkcarrya;
-			curloa = __builtin_addcl(curloa, curloa, 0u, &carrymida);
-			curhia = __builtin_addcl(curhia, curhia, carrymida, &checkcarrya);
+			unsigned long carrymidb, checkcarryb;
+			curlob = __builtin_addcl(curlob, curlob, 0u, &carrymidb);
+			curhib = __builtin_addcl(curhib, curhib, carrymidb, &checkcarryb);
 #endif
-			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
 #elif defined(_M_X64)
-			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0u, curloa, curloa, &curloa), curhia, curhia, &curhia)};
-			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0u, curlob, curlob, &curlob), curhib, curhib, &curhib)};
+			static_cast<void>(checkcarryb);
 #else
-			std::uint_least64_t curlotmpa{curloa};
-			curloa += curloa;
-			curhia += curhia;
-			curhia += curloa < curlotmpa;
+			std::uint_least64_t curlotmpb{curlob};
+			curlob += curlob;
+			curhib += curhib;
+			curhib += curlob < curlotmpb;
 #endif
 		}
 		curpb >>= 64 - 1;
@@ -12054,7 +12051,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	// determining the starting point depends on several factors here
 	static std::size_t constexpr stride{(static_cast<std::size_t>(1u) << setradix) - (isabsvalue && issignmode) * ((static_cast<std::size_t>(1u) << (setradix - 1u)) - !isfltpmode)};// shrink the offsets size if possible
 	X *RSBD8_RESTRICT t{offsets// low-to-high or high-to-low
-		+ (!isabsvalue && issignmode) * (((stride + isfltpmode) >> 1) - isdescsort)
+		+ (!isabsvalue && issignmode) * ((stride >> 1) - isdescsort)
 		+ (isdescsort && (isabsvalue || !issignmode)) * (stride - 1u)
 		+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	U offset{*t};
@@ -12263,7 +12260,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	static std::size_t constexpr offsetshiftcount{sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>) / sizeof(X)};
 	static std::size_t constexpr stride{(static_cast<std::size_t>(1u) << setradix) - (isabsvalue && issignmode) * ((static_cast<std::size_t>(1u) << (setradix - 1u)) - !isfltpmode)};// shrink the offsets size if possible
 	X *RSBD8_RESTRICT t{offsets// low-to-high or high-to-low
-		+ (!isabsvalue && issignmode) * (((stride + isfltpmode) >> 1) - isdescsort)
+		+ (!isabsvalue && issignmode) * ((stride >> 1) - isdescsort)
 		+ (isdescsort && (isabsvalue || !issignmode)) * (stride - 1u)
 		+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
@@ -13505,6 +13502,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else{// not in reverse order
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+		// architecture: limit to one at a time when there's few registers
 		// unsigned counter, not zero inclusive inside the loop
 		auto[i, loc]{initmtslicemt<1>(count, allowedthreads, assignedslice)};
 		input += loc;
@@ -15005,6 +15003,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, 0u)};
 
+			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
@@ -15282,7 +15281,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least32_t curmhi3{static_cast<std::uint_least32_t>(curmhi >> 32) & (1u << 11) - 1u};// decompose
 					std::uint_least32_t curmhi4{static_cast<std::uint_least32_t>(curmhi >> 43)};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pinputlo[0].mantissa = curmlo;
+						pinputlo[0].mantissa = curmhi;
 						prefetchforward(pinputlo + 1);
 						++pinputlo;
 						pbufferlo[0].mantissa = curmhi;
@@ -15402,7 +15401,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least64_t curmhi3{curmhi >> 33};
 					std::uint_least64_t curmhi4{curmhi >> 44};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pinputlo[0].mantissa = curmlo;
+						pinputlo[0].mantissa = curmhi;
 						prefetchforward(pinputlo + 1);
 						++pinputlo;
 						pbufferlo[0].mantissa = curmhi;
@@ -15465,6 +15464,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				T *RSBD8_RESTRICT pbuffer{buffer};
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+				// architecture: limit to one at a time when there's few registers
 				if constexpr(ismultithreadcapable) i = initmtslicemain<1>(count, allowedthreads, assignedslice);
 				do RSBD8_LIKELY{
 					U cure{pinput->signexponent};
@@ -15630,6 +15630,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, movetobuffer)};
 
+			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
@@ -19525,7 +19526,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 		}
 		// handle the top part for floating-point differently
-		if(!isabsvalue && isfltpmode && typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
+		if(!isabsvalue && isfltpmode && 64u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
 handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here, but that's fine
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 			// architecture: limit to four at a time when there's a decent amount of registers
@@ -19754,7 +19755,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 		}
 		// handle the top part for floating-point differently
-		if(!isabsvalue && isfltpmode && typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
+		if(!isabsvalue && isfltpmode && 64u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
 handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here, but that's fine
 			if constexpr(ismultithreadcapable){
 				static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
@@ -20296,6 +20297,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, 0u)};
 
+			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
@@ -20813,6 +20815,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, movetobuffer)};
 
+			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
@@ -21318,7 +21321,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 		}
 	}
-	if constexpr(!isabsvalue && isfltpmode) if(typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
+	if constexpr(!isabsvalue && isfltpmode) if(128u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY goto handletop;// rare, but possible
 	// also compensate for the remainder radix difference
 	shifter -= 64u + typeradix<T> - typeradixremainder<T>;
 	poffset -= (1u << typeradix<T>) - (1u << typeradixremainder<T>);
@@ -24105,7 +24108,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the main thread will never set it to a value with just a few lower bits set after the data exchange
 		}
 		// handle the top part for floating-point differently
-		if(!isabsvalue && isfltpmode && typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
+		if(!isabsvalue && isfltpmode && 32u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
 handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here, but that's fine
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 				std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
@@ -24373,7 +24376,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(key == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to a value with the higher bits set after the data exchange
 		}
 		// handle the top part for floating-point differently
-		if(!isabsvalue && isfltpmode && typebitsize<T> - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
+		if(!isabsvalue && isfltpmode && 32u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
 handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here, but that's fine
 			if constexpr(ismultithreadcapable){
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
@@ -24954,6 +24957,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, 0u)};
 
+			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
@@ -25586,6 +25590,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, movetobuffer)};
 
+			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
@@ -26435,7 +26440,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 		}
 		// handle the top part for floating-point differently
-		if(!isabsvalue && isfltpmode && 64u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
+		if(!isabsvalue && isfltpmode && 32u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
 handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here, but that's fine
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 				std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
@@ -26967,7 +26972,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 		}
 		// handle the top part for floating-point differently
-		if(!isabsvalue && isfltpmode && 64u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
+		if(!isabsvalue && isfltpmode && 32u - typeradixremainder<T> <= shifter)RSBD8_UNLIKELY{
 handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here, but that's fine
 			if constexpr(ismultithreadcapable){
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
@@ -33253,7 +33258,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<3>(count, allowedthreads, assignedslice);
 						T const *RSBD8_RESTRICT pinput{input + (count - i)};
-						do RSBD8_LIKELY{
+						i -= 2;
+						while(0 <= i)RSBD8_LIKELY{
 							U cura{pinput[0]};
 							U curb{pinput[1]};
 							U curc{pinput[2]};
@@ -33261,33 +33267,33 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							pinput += 3;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
-									cura, output + i, buffer + i,
-									curb, output + i - 1, buffer + i - 1,
-									curb, output + i - 2, buffer + i - 2);
-								prefetchwritebackward(output + i - 3);
-								prefetchwritebackward(buffer + i - 3);
+									cura, output + i + 2, buffer + i + 2,
+									curb, output + i + 1, buffer + i + 1,
+									curc, output + i, buffer + i);
+								prefetchwritebackward(output + i - 1);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0a{cura & (1u << 11) - 1u};
 							U cur1a{cura >> 11};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								output[i] = cura;
-								buffer[i] = cura;
+								output[i + 2] = cura;
+								buffer[i + 2] = cura;
 							}
 							cura >>= 22;
 							U cur0b{curb & (1u << 11) - 1u};
 							U cur1b{curb >> 11};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								output[i - 1] = curb;
-								buffer[i - 1] = curb;
+								output[i + 1] = curb;
+								buffer[i + 1] = curb;
 							}
 							curb >>= 22;
 							U cur0c{curc & (1u << 11) - 1u};
 							U cur1c{curc >> 11};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								output[i - 2] = curc;
-								prefetchwritebackward(output + i - 3);
-								buffer[i - 2] = curc;
-								prefetchwritebackward(buffer + i - 3);
+								output[i] = curc;
+								prefetchwritebackward(output + i - 1);
+								buffer[i] = curc;
+								prefetchwritebackward(buffer + i - 1);
 							}
 							curc >>= 22;
 							++offsets[cur0a];
@@ -33306,28 +33312,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 11) + static_cast<std::size_t>(cur1c)];
 							++offsets[(2u << 11) + static_cast<std::size_t>(curc)];
 							i -= 3;
-						}while(0 < i);
+						}
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
 							U cura{pinput[0]};
 							U curb{pinput[1]};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
-									cura, output, buffer,
-									curb, output - 1, buffer - 1);
+									cura, output + 1, buffer + 1,
+									curb, output, buffer);
 							}
 							U cur0a{cura & (1u << 11) - 1u};
 							U cur1a{cura >> 11};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								output[0] = cura;
-								buffer[0] = cura;
+								output[1] = cura;
+								buffer[1] = cura;
 							}
 							cura >>= 22;
 							U cur0b{curb & (1u << 11) - 1u};
 							U cur1b{curb >> 11};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								output[-1] = curb;
-								buffer[-1] = curb;
+								output[0] = curb;
+								buffer[0] = curb;
 							}
 							curb >>= 22;
 							++offsets[cur0a];
@@ -33530,7 +33536,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<3>(count, allowedthreads, assignedslice);
 						T const *RSBD8_RESTRICT pinput{input + (count - i)};
-						do RSBD8_LIKELY{
+						i -= 2;
+						while(0 <= i)RSBD8_LIKELY{
 							U cura{pinput[0]};
 							U curb{pinput[1]};
 							U curc{pinput[2]};
@@ -33538,33 +33545,33 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							pinput += 3;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
-									cura, output + i, buffer + i,
-									curb, output + i - 1, buffer + i - 1,
-									curb, output + i - 2, buffer + i - 2);
-								prefetchwritebackward(output + i - 3);
-								prefetchwritebackward(buffer + i - 3);
+									cura, output + i + 2, buffer + i + 2,
+									curb, output + i + 1, buffer + i + 1,
+									curc, output + i, buffer + i);
+								prefetchwritebackward(output + i - 1);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0a{cura & (1u << 8) - 1u};
 							U cur1a{cura >> 8};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								output[i] = cura;
-								buffer[i] = cura;
+								output[i + 2] = cura;
+								buffer[i + 2] = cura;
 							}
 							cura >>= 16;
 							U cur0b{curb & (1u << 8) - 1u};
 							U cur1b{curb >> 8};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								output[i - 1] = curb;
-								buffer[i - 1] = curb;
+								output[i + 1] = curb;
+								buffer[i + 1] = curb;
 							}
 							curb >>= 16;
 							U cur0c{curc & (1u << 8) - 1u};
 							U cur1c{curc >> 8};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								output[i - 2] = curc;
-								prefetchwritebackward(output + i - 3);
-								buffer[i - 2] = curc;
-								prefetchwritebackward(buffer + i - 3);
+								output[i] = curc;
+								prefetchwritebackward(output + i - 1);
+								buffer[i] = curc;
+								prefetchwritebackward(buffer + i - 1);
 							}
 							curc >>= 16;
 							++offsets[cur0a];
@@ -33583,28 +33590,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(cur1c)];
 							++offsets[(2u << 8) + static_cast<std::size_t>(curc)];
 							i -= 3;
-						}while(0 < i);
+						}
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
 							U cura{pinput[0]};
 							U curb{pinput[1]};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
-									cura, output, buffer,
-									curb, output - 1, buffer - 1);
+									cura, output + 1, buffer + 1,
+									curb, output, buffer);
 							}
 							U cur0a{cura & (1u << 8) - 1u};
 							U cur1a{cura >> 8};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								output[0] = cura;
-								buffer[0] = cura;
+								output[1] = cura;
+								buffer[1] = cura;
 							}
 							cura >>= 16;
 							U cur0b{curb & (1u << 8) - 1u};
 							U cur1b{curb >> 8};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								output[-1] = curb;
-								buffer[-1] = curb;
+								output[0] = curb;
+								buffer[0] = curb;
 							}
 							curb >>= 16;
 							++offsets[cur0a];
@@ -33995,6 +34002,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, 0u)};
 
+			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
@@ -35791,9 +35799,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 									cure, pinputhi - 2, pbufferhi - 2,
 									curf, pinputlo + 2, pbufferlo + 2);
 								prefetchbackward(pinputhi - 3);
+								pinputhi -= 3;
 								prefetchwritebackward(pbufferhi - 3);
+								pbufferhi -= 3;
 								prefetchforward(pinputlo + 3);
+								pinputlo += 3;
 								prefetchwriteforward(pbufferlo + 3);
+								pbufferlo += 3;
 							}
 							U cur0d{curd & (1u << 11) - 1u};
 							U cur1d{curd >> 11};
@@ -36232,9 +36244,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 									cure, pinputhi - 2, pbufferhi - 2,
 									curf, pinputlo + 2, pbufferlo + 2);
 								prefetchbackward(pinputhi - 3);
+								pinputhi -= 3;
 								prefetchwritebackward(pbufferhi - 3);
+								pbufferhi -= 3;
 								prefetchforward(pinputlo + 3);
+								pinputlo += 3;
 								prefetchwriteforward(pbufferlo + 3);
+								pbufferlo += 3;
 							}
 							U cur0d{curd & (1u << 8) - 1u};
 							U cur1d{curd >> 8};
@@ -36700,6 +36716,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
 			std::array<unsigned, 2> runstepsparitybool{generateoffsetsmultimain<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets.data(), usemultithread, movetobuffer)};
 
+			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// paritybool is either 0 or 1, packed in two bits below runsteps and with the multithreading pair of 1 (main) and -1 (companion) added on top
 			std::uintptr_t compound{static_cast<std::uintptr_t>(runstepsparitybool[0]) * 4u + static_cast<std::uintptr_t>(runstepsparitybool[1]) + static_cast<std::uintptr_t>(usemultithread)};
 			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
@@ -43745,6 +43762,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<4>(count, allowedthreads, assignedslice);
+						i -= 3;
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -43809,7 +43827,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								i = j + static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)));// -4, -3, -2 or -1, to add the remainder term after the two loops
 							}
 						}
-						i -= 3;
 						while(0 <= i)RSBD8_LIKELY{
 							V *RSBD8_RESTRICT pa{input[i + 3]};
 							V *RSBD8_RESTRICT pb{input[i + 2]};
@@ -48737,8 +48754,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			auto[curlo, curhi]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
 			std::size_t offsetlo, offsethi;// this is only allowed for the single-part version, containing just one sorting pass
 			if constexpr(isrevorder){
-				offsetlo = offsets[curlo + sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>) / sizeof(X)]--;// the next item will be placed one lower
-				offsethi = offsets[curhi]++;// the next item will be placed one higher
+				offsetlo = offsets[curlo]--;// the next item will be placed one lower
+				offsethi = offsets[curhi + sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>) / sizeof(X)]++;// the next item will be placed one higher
 			}else{
 				offsetlo = offsets[curlo]++;// the next item will be placed one higher
 				offsethi = offsets[curhi + sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>) / sizeof(X)]--;// the next item will be placed one lower
@@ -48777,7 +48794,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static std::ptrdiff_t constexpr offsetspivot{static_cast<std::ptrdiff_t>(sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>) / sizeof(X))};
 	static std::size_t constexpr stride{(static_cast<std::size_t>(1u) << CHAR_BIT * sizeof(T)) - (isabsvalue && issignmode) * ((static_cast<std::size_t>(1u) << (CHAR_BIT * sizeof(T) - 1u)) - !isfltpmode)};// shrink the offsets size if possible
 	X const *RSBD8_RESTRICT t{offsets// low-to-high or high-to-low
-		+ (!isabsvalue && issignmode) * (((stride + isfltpmode) >> 1) - isdescsort)
+		+ (!isabsvalue && issignmode) * ((stride >> 1) - isdescsort)
 		+ (isdescsort && (isabsvalue || !issignmode)) * (stride - 1u)
 		+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	U length{*t};
@@ -50545,8 +50562,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			auto[curlo, curhi]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
 			std::size_t offsetlo, offsethi;// this is only allowed for the single-part version, containing just one sorting pass
 			if constexpr(isrevorder){
-				offsetlo = offsets[curlo + sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>) / sizeof(X)]--;// the next item will be placed one lower
-				offsethi = offsets[curhi]++;// the next item will be placed one higher
+				offsetlo = offsets[curlo]--;// the next item will be placed one lower
+				offsethi = offsets[curhi + sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>) / sizeof(X)]++;// the next item will be placed one higher
 			}else{
 				offsetlo = offsets[curlo]++;// the next item will be placed one higher
 				offsethi = offsets[curhi + sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>) / sizeof(X)]--;// the next item will be placed one lower
@@ -50564,8 +50581,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			auto[curlo, curhi]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
 			std::size_t offsetlo, offsethi;// this is only allowed for the single-part version, containing just one sorting pass
 			if constexpr(isrevorder){
-				offsetlo = offsets[curlo + sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>) / sizeof(X)]--;// the next item will be placed one lower
-				offsethi = offsets[curhi]++;// the next item will be placed one higher
+				offsetlo = offsets[curlo]--;// the next item will be placed one lower
+				offsethi = offsets[curhi + sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>) / sizeof(X)]++;// the next item will be placed one higher
 			}else{
 				offsetlo = offsets[curlo]++;// the next item will be placed one higher
 				offsethi = offsets[curhi + sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>) / sizeof(X)]--;// the next item will be placed one lower
