@@ -3257,7 +3257,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::ptrdiff_t initmtslicemain(std::size_t cou
 	i += std::min(unassignedslices, slicerem);// only add on the remainder terms for this slice
 	if constexpr(1u < itemsperloop){
 		i *= itemsperloop;
-		i += rem;// include the final remainder term for outside of the loop in the next part
+		i += rem;// include the final remainder term of slice 0 (main thread)
 	}
 	--i;
 	return{static_cast<std::ptrdiff_t>(i)};// i is the signed item count minus one to simply iterate down to zero inclusive over the arrays
@@ -3299,14 +3299,13 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::size_t initmtsliceswapsmain(std::size_t c
 	assert(1u < count);
 	// the item count is rounded down in the lower set of threads, and rounded up in the upper set of threads
 	std::size_t i{count + 1u};
-	std::size_t loc{i >> 1};// determine the middle point, rounded down
-	std::size_t rem{i % itemsperloop};
+	std::size_t loc{i};
+	if constexpr(2u < itemsperloop) loc -= i % itemsperloop;// include the final remainder term of slice 0 (main thread)
 	i /= itemsperloop;
 	unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
 	i /= allowedthreads;
-	rem >>= 1;// exclude the odd count, related to "std::size_t loc{i >> 1};"
+	loc >>= 1;// determine the middle point, rounded down if itemsperloop is equal to 2
 	i += i * unassignedslices;// unassignedslices will usually be zero at this point
-	loc -= rem;
 	i += std::min(unassignedslices, slicerem);// only add on the remainder terms for this slice
 	loc -= i * (itemsperloop >> 1);
 	return{loc};// loc is the pointer relocation from the array start
@@ -3322,14 +3321,13 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtslic
 	assert(1u < count);
 	// the item count is rounded down in the lower set of threads, and rounded up in the upper set of threads
 	std::size_t i{count + 1u};
-	std::size_t loc{i >> 1};// determine the middle point, rounded down
-	std::size_t rem{i % itemsperloop};
+	std::size_t loc{i};
+	if constexpr(2u < itemsperloop) loc -= i % itemsperloop;// include the final remainder term of slice 0 (main thread)
 	i /= itemsperloop;
 	unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
 	i /= allowedthreads;
-	rem >>= 1;// exclude the odd count, related to "std::size_t loc{i >> 1};"
+	loc >>= 1;// determine the middle point, rounded down if itemsperloop is equal to 2
 	std::size_t j{i + i * assignedslice};
-	loc -= rem;// include the final remainder term of slice 0 (main thread)
 	j += std::min(assignedslice, slicerem);// only add on the remainder terms for this slice
 	addcarryoflessorequal(i, assignedslice, slicerem);
 	loc -= j * (itemsperloop >> 1);
