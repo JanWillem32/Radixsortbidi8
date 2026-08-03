@@ -3246,26 +3246,18 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::ptrdiff_t initmtslicemain(std::size_t cou
 	assert(1u < count);
 	// the item count is rounded down in the lower set of threads, and rounded up in the upper set of threads
 	std::size_t i{count + 1u};
+	RSBD8_MAYBE_UNUSED std::size_t rem;
 	if constexpr(1u < itemsperloop){
-		std::size_t rem{i % itemsperloop};
+		rem = i % itemsperloop;
 		i /= itemsperloop;
-		unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
-		i /= allowedthreads;
-		unsigned slicesother{allowedthreads >> 1};
-		if(slicerem < slicesother) slicerem = slicesother;
-		i += i * unassignedslices;// unassignedslices will usually be zero at this point
-		slicerem -= slicesother;
-		i += std::min(slicerem, unassignedslices);// only add on the remainder terms for this slice
+	}
+	unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
+	i /= allowedthreads;
+	i += i * unassignedslices;// unassignedslices will usually be zero at this point
+	i += std::min(unassignedslices, slicerem);// only add on the remainder terms for this slice
+	if constexpr(1u < itemsperloop){
 		i *= itemsperloop;
 		i += rem;// include the final remainder term for outside of the loop in the next part
-	}else{// single item per loop
-		unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
-		i /= allowedthreads;
-		unsigned slicesother{allowedthreads >> 1};
-		if(slicerem < slicesother) slicerem = slicesother;
-		i += i * unassignedslices;// unassignedslices will usually be zero at this point
-		slicerem -= slicesother;
-		i += std::min(slicerem, unassignedslices);// only add on the remainder terms for this slice
 	}
 	--i;
 	return{static_cast<std::ptrdiff_t>(i)};// i is the signed item count minus one to simply iterate down to zero inclusive over the arrays
@@ -3280,30 +3272,20 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtslic
 	assert(1u < count);
 	// the item count is rounded down in the lower set of threads, and rounded up in the upper set of threads
 	std::size_t i{count + 1u};
-	std::size_t loc;
+	RSBD8_MAYBE_UNUSED std::size_t rem;
 	if constexpr(1u < itemsperloop){
-		std::size_t rem{i % itemsperloop};
+		rem = i % itemsperloop;
 		i /= itemsperloop;
-		unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
-		i /= allowedthreads;
-		allowedthreads -= assignedslice;
-		loc = assignedslice * i;
-		addcarryoflessorequal(i, allowedthreads, slicerem);
-		if(slicerem < allowedthreads) slicerem = allowedthreads;
-		loc -= allowedthreads;
-		loc += slicerem;
+	}
+	unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
+	i /= allowedthreads;
+	std::size_t loc{assignedslice * i};
+	addcarryoflessorequal(i, assignedslice, slicerem);
+	loc += std::min(assignedslice - 1u, slicerem);// only add on the remainder terms for this slice
+	if constexpr(1u < itemsperloop){
 		i *= itemsperloop;
 		loc *= itemsperloop;
-		loc += rem;// include the final remainder term of slice 0 (main)
-	}else{// single item per loop
-		unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
-		i /= allowedthreads;
-		allowedthreads -= assignedslice;
-		loc = assignedslice * i;
-		addcarryoflessorequal(i, allowedthreads, slicerem);
-		if(slicerem < allowedthreads) slicerem = allowedthreads;
-		loc -= allowedthreads;
-		loc += slicerem;
+		loc += rem;// include the final remainder term of slice 0 (main thread)
 	}
 	return{i, loc};// i is an item count, not a loop count, paired with loc which is the pointer relocation from the array start
 }
@@ -3317,18 +3299,16 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::size_t initmtsliceswapsmain(std::size_t c
 	assert(1u < count);
 	// the item count is rounded down in the lower set of threads, and rounded up in the upper set of threads
 	std::size_t i{count + 1u};
-	std::size_t loc{i >> 1};// determine the middle point, rounded up using the the final remainder term
+	std::size_t loc{i >> 1};// determine the middle point, rounded down
 	std::size_t rem{i % itemsperloop};
 	i /= itemsperloop;
-	unsigned slicesother{allowedthreads >> 1};
 	unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
 	i /= allowedthreads;
-	loc += rem;// include the final remainder term for outside of the loop in the next part
-	if(slicerem < slicesother) slicerem = slicesother;
+	rem >>= 1;// exclude the odd count, related to "std::size_t loc{i >> 1};"
 	i += i * unassignedslices;// unassignedslices will usually be zero at this point
-	slicerem -= slicesother;
-	i += std::min(slicerem, unassignedslices);// only add on the remainder terms for this slice
-	loc += i * (itemsperloop >> 1);
+	loc -= rem;
+	i += std::min(unassignedslices, slicerem);// only add on the remainder terms for this slice
+	loc -= i * (itemsperloop >> 1);
 	return{loc};// loc is the pointer relocation from the array start
 }
 
@@ -3342,20 +3322,17 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtslic
 	assert(1u < count);
 	// the item count is rounded down in the lower set of threads, and rounded up in the upper set of threads
 	std::size_t i{count + 1u};
-	std::size_t baseloc{i >> 1};// determine the middle point, rounded up using the the final remainder term
+	std::size_t loc{i >> 1};// determine the middle point, rounded down
 	std::size_t rem{i % itemsperloop};
 	i /= itemsperloop;
 	unsigned slicerem{static_cast<unsigned>(i % allowedthreads)};
 	i /= allowedthreads;
-	allowedthreads -= assignedslice;
-	std::size_t loc{assignedslice * i};
-	addcarryoflessorequal(i, allowedthreads, slicerem);
-	if(slicerem < allowedthreads) slicerem = allowedthreads;
-	loc -= allowedthreads;
-	baseloc += rem;// include the final remainder term of slice 0 (main)
-	loc += slicerem;
-	loc *= itemsperloop >> 1;
-	loc += baseloc;// move to past the middle point
+	rem >>= 1;// exclude the odd count, related to "std::size_t loc{i >> 1};"
+	std::size_t j{i + i * assignedslice};
+	loc -= rem;// include the final remainder term of slice 0 (main thread)
+	j += std::min(assignedslice, slicerem);// only add on the remainder terms for this slice
+	addcarryoflessorequal(i, assignedslice, slicerem);
+	loc -= j * (itemsperloop >> 1);
 	return{i, loc};// i is a loop count, not an item count, paired with loc which is the pointer relocation from the array start
 }
 
@@ -11635,7 +11612,7 @@ nextsecondary:
 // Utilities to implement the index counts to offsets transforms
 
 // version for both threads when multithreading is used at run time (writes a full set of offsets in this case)
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X, unsigned setradix>
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X, unsigned setradix>
 RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
 	unsigned> generateoffsetshelpernotshared(std::size_t count, X *RSBD8_RESTRICT offsets)noexcept{
@@ -11649,43 +11626,42 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// determining the starting point depends on several factors here
-	static std::ptrdiff_t constexpr offsetspivot{(1 - isrevorder * 2) * static_cast<std::ptrdiff_t>(sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>) / sizeof(X))};
+	static std::ptrdiff_t constexpr offsetshiftcount{static_cast<std::ptrdiff_t>(sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>) / sizeof(X))};
 	static std::size_t constexpr stride{(static_cast<std::size_t>(1u) << setradix) - (isabsvalue && issignmode) * ((static_cast<std::size_t>(1u) << (setradix - 1u)) - !isfltpmode)};// shrink the offsets size if possible
 	if constexpr(isdescsort){
 		X *RSBD8_RESTRICT t{offsets// high-to-low
-			- isrevorder * offsetspivot
 			+ (!isabsvalue && issignmode) * ((stride >> 1) - 1u)
 			+ (isabsvalue || !issignmode) * (stride - 1u)
 			- (isabsvalue && !issignmode && isfltpmode)};
-		U offset{static_cast<U>(*t) + static_cast<U>(t[offsetspivot])};
+		U offset{static_cast<U>(*t) + static_cast<U>(t[offsetshiftcount])};
 		*t = 0u;// the first offset always starts at zero
 		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 			--t;
 			unsigned j{(1u << (setradix - 1u)) - 1u};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do RSBD8_LIKELY{
-				U difference{static_cast<U>(*t) + static_cast<U>(t[offsetspivot])};
+				U difference{static_cast<U>(*t) + static_cast<U>(t[offsetshiftcount])};
 				*t = static_cast<X>(offset);
-				t[offsetspivot + 1] = static_cast<X>(offset - 1u);
+				t[offsetshiftcount + 1] = static_cast<X>(offset - 1u);
 				prefetchbackward(t - 1);
-				prefetchbackward(t + offsetspivot - 1);
+				prefetchbackward(t + offsetshiftcount - 1);
 				--t;
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
-			U differencemid{static_cast<U>(t[1 << setradix]) + static_cast<U>(t[offsetspivot + (1 << setradix)])};
+			U differencemid{static_cast<U>(t[1 << setradix]) + static_cast<U>(t[offsetshiftcount + (1 << setradix)])};
 			t[1 << setradix] = static_cast<X>(offset);
-			t[offsetspivot + 1] = static_cast<X>(offset - 1u);
+			t[offsetshiftcount + 1] = static_cast<X>(offset - 1u);
 			t += (1 << setradix) - 1;// offset to the start/end of the range
 			j = (1u << (setradix - 1u)) - 2u;
 			offset += differencemid;
 			addcarryofless(b, static_cast<U>(count), differencemid);
 			do RSBD8_LIKELY{
-				U difference{static_cast<U>(*t) + static_cast<U>(t[offsetspivot])};
+				U difference{static_cast<U>(*t) + static_cast<U>(t[offsetshiftcount])};
 				*t = static_cast<X>(offset);
-				t[offsetspivot + 1] = static_cast<X>(offset - 1u);
+				t[offsetshiftcount + 1] = static_cast<X>(offset - 1u);
 				prefetchbackward(t - 1);
-				prefetchbackward(t + offsetspivot - 1);
+				prefetchbackward(t + offsetshiftcount - 1);
 				--t;
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
@@ -11697,17 +11673,17 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 				unsigned j{(1u << (setradix - 1u)) - 1u};// double the number of items per loop
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do RSBD8_LIKELY{
-					U difference{static_cast<U>(*t) + static_cast<U>(t[offsetspivot])};// even
+					U difference{static_cast<U>(*t) + static_cast<U>(t[offsetshiftcount])};// even
 					*t = static_cast<X>(offset);
-					t[offsetspivot - 1] = static_cast<X>(offset - 1u);// odd
+					t[offsetshiftcount - 1] = static_cast<X>(offset - 1u);// odd
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
-					difference = static_cast<U>(t[-3]) + static_cast<U>(t[offsetspivot - 3]);// odd
+					difference = static_cast<U>(t[-3]) + static_cast<U>(t[offsetshiftcount - 3]);// odd
 					t[-3] = static_cast<X>(offset);
-					t[offsetspivot] = static_cast<X>(offset - 1u);// even
+					t[offsetshiftcount] = static_cast<X>(offset - 1u);// even
 					// step forward twice
 					prefetchbackward(t - 2);
-					prefetchbackward(t + offsetspivot - 2);
+					prefetchbackward(t + offsetshiftcount - 2);
 					t -= 2;
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
@@ -11717,29 +11693,28 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 				unsigned j{(1u << setradix) - 2u};
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do RSBD8_LIKELY{
-					U difference{static_cast<U>(*t) + static_cast<U>(t[offsetspivot])};
+					U difference{static_cast<U>(*t) + static_cast<U>(t[offsetshiftcount])};
 					*t = static_cast<X>(offset);
-					t[offsetspivot + 1] = static_cast<X>(offset - 1u);
+					t[offsetshiftcount + 1] = static_cast<X>(offset - 1u);
 					prefetchbackward(t - 1);
-					prefetchbackward(t + offsetspivot - 1);
+					prefetchbackward(t + offsetshiftcount - 1);
 					--t;
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
 			}
 		}
-		addcarryofless(b, static_cast<U>(count), static_cast<U>(*t) + static_cast<U>(t[offsetspivot]));
-		t[offsetspivot] = static_cast<X>(count);// the last offset always starts at the end
+		addcarryofless(b, static_cast<U>(count), static_cast<U>(*t) + static_cast<U>(t[offsetshiftcount]));
+		t[offsetshiftcount] = static_cast<X>(count);// the last offset always starts at the end
 		*t = static_cast<X>(offset);
 		// again, adjust for the special mode
-		t[offsetspivot + 1 - (isabsvalue && !issignmode && isfltpmode) * 2] = static_cast<X>(offset - 1u);
+		t[offsetshiftcount + !(isabsvalue && !issignmode && isfltpmode) * 2 - 1] = static_cast<X>(offset - 1u);
 	}else{// !isdescsort
 		X *RSBD8_RESTRICT t{offsets + (stride - 1u)// high-to-low
-			- isrevorder * offsetspivot
 			- (!isabsvalue && issignmode) * (stride >> 1)
 			- (isabsvalue && !issignmode && isfltpmode)};
-		U initdifference{static_cast<U>(*t) + static_cast<U>(t[offsetspivot])};
-		t[offsetspivot] = static_cast<X>(count);// the last offset always starts at the end
+		U initdifference{static_cast<U>(*t) + static_cast<U>(t[offsetshiftcount])};
+		t[offsetshiftcount] = static_cast<X>(count);// the last offset always starts at the end
 		U offset;
 		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 			--t;
@@ -11747,28 +11722,28 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 			offset = static_cast<U>(count) - initdifference;
 			b = count < initdifference;// carry-out can only happen once per cycle here, so optimise that
 			do RSBD8_LIKELY{
-				U difference{static_cast<U>(*t) + static_cast<U>(t[offsetspivot])};
-				t[offsetspivot] = static_cast<X>(offset);
+				U difference{static_cast<U>(*t) + static_cast<U>(t[offsetshiftcount])};
+				t[offsetshiftcount] = static_cast<X>(offset);
 				t[1] = static_cast<X>(offset + 1u);
 				prefetchbackward(t - 1);
-				prefetchbackward(t + offsetspivot - 1);
+				prefetchbackward(t + offsetshiftcount - 1);
 				--t;
 				offset -= difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
-			U differencemid{static_cast<U>(t[1 << setradix]) + static_cast<U>(t[offsetspivot + (1 << setradix)])};
-			t[offsetspivot + (1 << setradix)] = static_cast<X>(offset);
+			U differencemid{static_cast<U>(t[1 << setradix]) + static_cast<U>(t[offsetshiftcount + (1 << setradix)])};
+			t[offsetshiftcount + (1 << setradix)] = static_cast<X>(offset);
 			t[1] = static_cast<X>(offset + 1u);
 			t += (1 << setradix) - 1;// offset to the start/end of the range
 			j = (1u << (setradix - 1u)) - 2u;
 			offset -= differencemid;
 			addcarryofless(b, static_cast<U>(count), differencemid);
 			do RSBD8_LIKELY{
-				U difference{static_cast<U>(*t) + static_cast<U>(t[offsetspivot])};
-				t[offsetspivot] = static_cast<X>(offset);
+				U difference{static_cast<U>(*t) + static_cast<U>(t[offsetshiftcount])};
+				t[offsetshiftcount] = static_cast<X>(offset);
 				t[1] = static_cast<X>(offset + 1u);
 				prefetchbackward(t - 1);
-				prefetchbackward(t + offsetspivot - 1);
+				prefetchbackward(t + offsetshiftcount - 1);
 				--t;
 				offset -= difference;
 				addcarryofless(b, static_cast<U>(count), difference);
@@ -11781,17 +11756,17 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 				offset = static_cast<U>(count) - initdifference;
 				b = count < initdifference;// carry-out can only happen once per cycle here, so optimise that
 				do RSBD8_LIKELY{
-					U difference{static_cast<U>(*t) + static_cast<U>(t[offsetspivot])};// even
-					t[offsetspivot] = static_cast<X>(offset);// even
+					U difference{static_cast<U>(*t) + static_cast<U>(t[offsetshiftcount])};// even
+					t[offsetshiftcount] = static_cast<X>(offset);// even
 					t[-1] = static_cast<X>(offset + 1u);// odd
 					offset -= difference;
 					addcarryofless(b, static_cast<U>(count), difference);
-					difference = static_cast<U>(t[-3]) + static_cast<U>(t[offsetspivot - 3]);// odd
-					t[offsetspivot - 3] = static_cast<X>(offset);// odd
+					difference = static_cast<U>(t[-3]) + static_cast<U>(t[offsetshiftcount - 3]);// odd
+					t[offsetshiftcount - 3] = static_cast<X>(offset);// odd
 					*t = static_cast<X>(offset + 1u);// even
 					// step forward twice
 					prefetchbackward(t - 2);
-					prefetchbackward(t + offsetspivot - 2);
+					prefetchbackward(t + offsetshiftcount - 2);
 					t -= 2;
 					offset -= difference;
 					addcarryofless(b, static_cast<U>(count), difference);
@@ -11802,20 +11777,20 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 				offset = static_cast<U>(count) - initdifference;
 				b = count < initdifference;// carry-out can only happen once per cycle here, so optimise that
 				do RSBD8_LIKELY{
-					U difference{static_cast<U>(*t) + static_cast<U>(t[offsetspivot])};
-					t[offsetspivot] = static_cast<X>(offset);
+					U difference{static_cast<U>(*t) + static_cast<U>(t[offsetshiftcount])};
+					t[offsetshiftcount] = static_cast<X>(offset);
 					t[1] = static_cast<X>(offset + 1u);
 					prefetchbackward(t - 1);
-					prefetchbackward(t + offsetspivot - 1);
+					prefetchbackward(t + offsetshiftcount - 1);
 					--t;
 					offset -= difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
 			}
 		}
-		addcarryofless(b, static_cast<U>(count), static_cast<U>(*t) + static_cast<U>(t[offsetspivot]));
+		addcarryofless(b, static_cast<U>(count), static_cast<U>(*t) + static_cast<U>(t[offsetshiftcount]));
 		*t = 0u;// the first offset always starts at zero
-		t[offsetspivot] = static_cast<X>(offset);
+		t[offsetshiftcount] = static_cast<X>(offset);
 		// again, adjust for the special mode
 		t[1 - (isabsvalue && !issignmode && isfltpmode) * 2] = static_cast<X>(offset + 1u);
 	}
@@ -12257,7 +12232,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	// transform counts into base offsets
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// determining the starting point depends on several factors here
-	static std::size_t constexpr offsetshiftcount{sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>) / sizeof(X)};
+	static std::ptrdiff_t constexpr offsetshiftcount{sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>) / sizeof(X)};
 	static std::size_t constexpr stride{(static_cast<std::size_t>(1u) << setradix) - (isabsvalue && issignmode) * ((static_cast<std::size_t>(1u) << (setradix - 1u)) - !isfltpmode)};// shrink the offsets size if possible
 	X *RSBD8_RESTRICT t{offsets// low-to-high or high-to-low
 		+ (!isabsvalue && issignmode) * ((stride >> 1) - isdescsort)
@@ -12319,7 +12294,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 					difference = t[3 - isdescsort * 6];// odd
-					t[offsetshiftcount + 3u - isdescsort * 6u] = static_cast<X>(offset);
+					t[offsetshiftcount + 3 - isdescsort * 6] = static_cast<X>(offset);
 					*t = static_cast<X>(offset - 1u);// even
 					// step forward twice
 					if constexpr(isdescsort){
@@ -12366,7 +12341,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 			do RSBD8_LIKELY{
 				U difference{*t};
 				*t = static_cast<X>(offset);
-				t[offsetshiftcount + isdescsort * 2u - 1u] = static_cast<X>(offset - 1u);
+				t[offsetshiftcount + isdescsort * 2 - 1] = static_cast<X>(offset - 1u);
 				if constexpr(isdescsort){
 					prefetchbackward(t - 1);
 					--t;
@@ -12379,7 +12354,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(--j);
 			U differencemid{t[(isdescsort * 2 - 1) << setradix]};
 			t[(isdescsort * 2 - 1) << setradix] = static_cast<X>(offset);
-			t[offsetshiftcount + isdescsort * 2u - 1u] = static_cast<X>(offset - 1u);
+			t[offsetshiftcount + isdescsort * 2 - 1] = static_cast<X>(offset - 1u);
 			t += ((1 << setradix) - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			j = (1u << (setradix - 1u)) - 2u;
 			offset += differencemid;
@@ -12387,7 +12362,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 			do RSBD8_LIKELY{
 				U difference{*t};
 				*t = static_cast<X>(offset);
-				t[offsetshiftcount + isdescsort * 2u - 1u] = static_cast<X>(offset - 1u);
+				t[offsetshiftcount + isdescsort * 2 - 1] = static_cast<X>(offset - 1u);
 				if constexpr(isdescsort){
 					prefetchbackward(t - 1);
 					--t;
@@ -12407,7 +12382,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 				do RSBD8_LIKELY{
 					U difference{*t};// even
 					*t = static_cast<X>(offset);
-					t[offsetshiftcount + 1u - isdescsort * 2u] = static_cast<X>(offset - 1u);// odd
+					t[offsetshiftcount + 1 - isdescsort * 2] = static_cast<X>(offset - 1u);// odd
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 					difference = t[3 - isdescsort * 6];// odd
@@ -12431,7 +12406,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 				do RSBD8_LIKELY{
 					U difference{*t};
 					*t = static_cast<X>(offset);
-					t[offsetshiftcount + isdescsort * 2u - 1u] = static_cast<X>(offset - 1u);
+					t[offsetshiftcount + isdescsort * 2 - 1] = static_cast<X>(offset - 1u);
 					if constexpr(isdescsort){
 						prefetchbackward(t - 1);
 						--t;
@@ -12448,7 +12423,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 		t[offsetshiftcount] = static_cast<X>(count);// the last offset always starts at the end
 		*t = static_cast<X>(offset);
 		// again, adjust for the special mode
-		t[offsetshiftcount + ((isabsvalue && !issignmode && isfltpmode) != isdescsort) * 2u - 1u] = static_cast<X>(offset - 1u);
+		t[offsetshiftcount + ((isabsvalue && !issignmode && isfltpmode) != isdescsort) * 2 - 1] = static_cast<X>(offset - 1u);
 	}
 	return{b};
 }
@@ -12471,7 +12446,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // version specific for writing the lower half when multithreading is used (writes half a set of offsets in this case)
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X, unsigned setradix>
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X, unsigned setradix>
 RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
 	unsigned> generateoffsetshelpersharedlowerhalf(std::size_t count, X *RSBD8_RESTRICT offsets)noexcept{
@@ -12482,13 +12457,13 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
-	if constexpr(isdescsort) b = generateoffsetssinglehelpermain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, setradix>(count, offsets);
-	else b = generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, setradix>(count, offsets);
+	if constexpr(isdescsort) b = generateoffsetssinglehelpermain<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, setradix>(count, offsets);
+	else b = generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, setradix>(count, offsets);
 	return{b};
 }
 
 // version specific for writing the upper half when multithreading is used (writes half a set of offsets in this case)
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X, unsigned setradix>
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X, unsigned setradix>
 RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
 	unsigned> generateoffsetshelpersharedupperhalf(std::size_t count, X *RSBD8_RESTRICT offsets)noexcept{
@@ -12499,8 +12474,8 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
-	if constexpr(isdescsort) b = generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, setradix>(count, offsets);
-	else b = generateoffsetssinglehelpermain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, setradix>(count, offsets);
+	if constexpr(isdescsort) b = generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, setradix>(count, offsets);
+	else b = generateoffsetssinglehelpermain<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, setradix>(count, offsets);
 	return{b};
 }
 
@@ -12549,20 +12524,20 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 		// the topmost and bottommost sets can be shared between the main and companion thread here
 		// handle the topmost 3 for 80-bit, or the topmost 1 for other types first
 		if constexpr(80u == typebitsize<T> || typeradixremainder<T> != typeradix<T> || issignmode){// start off with remainder radix or signed absolute handling on the top, split it up if absolute mode is used
-			if constexpr(80u != typebitsize<T> && typeradixremainder<T> != typeradix<T> || isabsvalue && issignmode) paritybool = generateoffsetshelpersharedlowerhalf<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase);
-			else paritybool = generateoffsetshelpernotshared<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase);
+			if constexpr(80u != typebitsize<T> && typeradixremainder<T> != typeradix<T> || isabsvalue && issignmode) paritybool = generateoffsetshelpersharedlowerhalf<isdescsort, isabsvalue, issignmode, isfltpmode, T, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase);
+			else paritybool = generateoffsetshelpernotshared<isdescsort, isabsvalue, issignmode, isfltpmode, T, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase);
 			skipsteps = paritybool << (offsetsloopcount<T> - 1u);
 			if constexpr(80u == typebitsize<T>){// handle these sets like regular unsigned
 				if constexpr(isabsvalue && issignmode){
 					tbase -= 1u << 8u;
-					unsigned bhi{generateoffsetshelpersharedlowerhalf<isdescsort, false, false, false, false, T, X, 8u>(count, tbase)};
+					unsigned bhi{generateoffsetshelpersharedlowerhalf<isdescsort, false, false, false, T, X, 8u>(count, tbase)};
 					tbase -= 1u << typeradixremainder<T>;
 					paritybool ^= bhi;
 					skipsteps |= bhi << (offsetsloopcount<T> - 2u);
 				}else{
 					tbase -= (1u << 8u) + (1u << typeradixremainder<T>);
 				}
-				unsigned blo{generateoffsetshelpersharedlowerhalf<isdescsort, false, false, false, false, T, X, typeradixremainder<T>>(count, tbase)};
+				unsigned blo{generateoffsetshelpersharedlowerhalf<isdescsort, false, false, false, T, X, typeradixremainder<T>>(count, tbase)};
 				paritybool ^= blo;
 				skipsteps |= blo << (offsetsloopcount<T> - 3u);
 			}
@@ -12578,20 +12553,20 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(1u < kbase){
 			unsigned k{kbase};
 			do RSBD8_LIKELY{// handle these sets like regular unsigned
-				unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, false, T, X, typeradix<T>>(count, tbase)};
+				unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, T, X, typeradix<T>>(count, tbase)};
 				tbase -= 1u << typeradix<T>;
 				paritybool ^= b;
 				skipsteps |= b << (k + offsetsloopcount<T> - 1u - halfsets);
 			}while(--k);
 		}else if constexpr(1u == kbase){// handle this set like regular unsigned
-			unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, false, T, X, typeradix<T>>(count, tbase)};
+			unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, T, X, typeradix<T>>(count, tbase)};
 			paritybool ^= b;
 			//tbase -= 1u << typeradix<T>; not necessary since this is the last set in the body
 			skipsteps += b << (offsetsloopcount<T> - 1u - (typeradixremainder<T> != typeradix<T> || issignmode));
 		}
 		// handle the last split up set at the bottom (for odd counts)
 		if constexpr(1u & fullsets){
-			unsigned b{generateoffsetshelpersharedlowerhalf<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, offsets)};
+			unsigned b{generateoffsetshelpersharedlowerhalf<isdescsort, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, offsets)};
 			paritybool ^= b;
 			skipsteps |= b;
 		}
@@ -12599,19 +12574,19 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 		// both or none of the top sets of the halves (which are using typeradixremainder<T>) are shared between the main and companion thread here
 		// handle the topmost 2 + 1 for 80-bit, or the topmost 1 for other types first
 		if constexpr(isabsvalue && issignmode) paritybool = generateoffsetssinglehelpermtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase);
-		else paritybool = generateoffsetshelpernotshared<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase);
+		else paritybool = generateoffsetshelpernotshared<isdescsort, isabsvalue, issignmode, isfltpmode, T, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase);
 		skipsteps = paritybool << (offsetsloopcountsplitup<T> - 1u);
 		if constexpr(80u == typebitsize<T>){// handle these sets like regular unsigned
 			if constexpr(isabsvalue && issignmode){
 				tbase -= 1u << 8u;
-				unsigned bhi{generateoffsetshelpersharedlowerhalf<isdescsort, false, false, false, false, T, X, 8u>(count, tbase)};
+				unsigned bhi{generateoffsetshelpersharedlowerhalf<isdescsort, false, false, false, T, X, 8u>(count, tbase)};
 				tbase -= 1u << typeradixremainder<T>;
 				paritybool ^= bhi;
 				skipsteps |= bhi << (offsetsloopcountsplitup<T> - 2u);
 			}else{
 				tbase -= (1u << 8u) + (1u << typeradixremainder<T>);
 			}
-			unsigned blo{generateoffsetshelpernotshared<isdescsort, false, false, false, false, T, X, typeradixremainder<T>>(count, tbase)};
+			unsigned blo{generateoffsetshelpernotshared<isdescsort, false, false, false, T, X, typeradixremainder<T>>(count, tbase)};
 			paritybool ^= blo;
 			skipsteps |= blo << (offsetsloopcountsplitup<T> - 2u);
 		}
@@ -12620,14 +12595,14 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(2u < offsetsloopcountsplitup<T>){
 			signed k{static_cast<signed>(offsetsloopcountsplitup<T> - 2u)};
 			do RSBD8_LIKELY{// handle these sets like regular unsigned
-				unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, false, T, X, typeradix<T>>(count, tbase)};
+				unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, T, X, typeradix<T>>(count, tbase)};
 				tbase -= 1u << typeradix<T>;
 				paritybool ^= b;
 				skipsteps |= b << (k + offsetsloopcountsplitup<T>);
 				--k;
 			}while(0 <= k);
 		}else if constexpr(2u == offsetsloopcountsplitup<T>){// handle this set like regular unsigned
-			unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, false, T, X, typeradix<T>>(count, tbase)};
+			unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, T, X, typeradix<T>>(count, tbase)};
 			tbase -= 1u << typeradix<T>;
 			paritybool ^= b;
 			skipsteps |= b << offsetsloopcountsplitup<T>;
@@ -12692,16 +12667,16 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 			static unsigned constexpr fullsets{offsetsloopcount<T> - 2u * (80u == typebitsize<T>) - (typeradixremainder<T> != typeradix<T> || isabsvalue && issignmode)};
 			static unsigned constexpr halfsets{fullsets >> 1};
 			if constexpr((80u != typebitsize<T> && typeradixremainder<T> != typeradix<T>) || isabsvalue && issignmode){// start off with remainder radix or signed absolute handling on the top, split it up if absolute mode is used
-				unsigned b{generateoffsetshelpersharedupperhalf<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase)};
+				unsigned b{generateoffsetshelpersharedupperhalf<isdescsort, isabsvalue, issignmode, isfltpmode, T, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase)};
 				paritybool ^= b;
 				skipsteps = b << (offsetsloopcount<T> - 1u);
 				if constexpr(80u == typebitsize<T>){// handle these sets like regular unsigned
 					tbase -= 1u << 8u;
-					unsigned bhi{generateoffsetshelpersharedupperhalf<isdescsort, false, false, false, false, T, X, 8u>(count, tbase)};
+					unsigned bhi{generateoffsetshelpersharedupperhalf<isdescsort, false, false, false, T, X, 8u>(count, tbase)};
 					tbase -= 1u << typeradixremainder<T>;
 					paritybool ^= bhi;
 					skipsteps |= bhi << (offsetsloopcount<T> - 2u);
-					unsigned blo{generateoffsetshelpersharedupperhalf<isdescsort, false, false, false, false, T, X, typeradixremainder<T>>(count, tbase)};
+					unsigned blo{generateoffsetshelpersharedupperhalf<isdescsort, false, false, false, T, X, typeradixremainder<T>>(count, tbase)};
 					tbase -= (halfsets + 1u) << typeradix<T>;
 					paritybool ^= blo;
 					skipsteps |= blo << (offsetsloopcount<T> - 3u);
@@ -12710,11 +12685,11 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 			}else if constexpr(80u == typebitsize<T>){// handle these sets like regular unsigned
 				tbase -= 1u << 8u;
-				unsigned bhi{generateoffsetshelpernotshared<isdescsort, false, false, false, false, T, X, 8u>(count, tbase)};
+				unsigned bhi{generateoffsetshelpernotshared<isdescsort, false, false, false, T, X, 8u>(count, tbase)};
 				tbase -= 1u << typeradixremainder<T>;
 				paritybool ^= bhi;
 				skipsteps = bhi << (offsetsloopcount<T> - 2u);
-				unsigned blo{generateoffsetshelpersharedupperhalf<isdescsort, false, false, false, false, T, X, typeradixremainder<T>>(count, tbase)};
+				unsigned blo{generateoffsetshelpersharedupperhalf<isdescsort, false, false, false, T, X, typeradixremainder<T>>(count, tbase)};
 				tbase -= (halfsets + 1u) << typeradix<T>;
 				paritybool ^= blo;
 				skipsteps |= blo << (offsetsloopcount<T> - 3u);
@@ -12726,14 +12701,14 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 			if constexpr(1u < halfsets){
 				signed k{static_cast<signed>(halfsets - 1u + (1u & fullsets | (isabsvalue && !issignmode && isfltpmode)))};
 				do RSBD8_LIKELY{// handle these sets like regular unsigned
-					unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, false, T, X, typeradix<T>>(count, tbase)};
+					unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, T, X, typeradix<T>>(count, tbase)};
 					tbase -= 1u << typeradix<T>;
 					paritybool ^= b;
 					skipsteps |= b << k;
 					--k;
 				}while((1u & fullsets || isabsvalue && !issignmode && isfltpmode)? 0 < k : 0 <= k);
 			}else if constexpr(1u + (isabsvalue && !issignmode && isfltpmode) == halfsets){// handle this set like regular unsigned
-				unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, false, T, X, typeradix<T>>(count, tbase)};
+				unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, T, X, typeradix<T>>(count, tbase)};
 				//tbase -= 1u << typeradix<T>; not necessary since this is the last set in the body
 				paritybool ^= b;
 				skipsteps |= b << static_cast<unsigned>(isabsvalue && !issignmode && isfltpmode);
@@ -12741,8 +12716,8 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 			// handle the last split up set (for odd counts) and if the absolute floating-point special mode is active
 			if constexpr((1u & fullsets) || isabsvalue && !issignmode && isfltpmode){
 				unsigned b;
-				if constexpr(1u & fullsets) b = generateoffsetshelpersharedupperhalf<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, offsets);
-				else b = generateoffsetshelpernotshared<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, offsets);
+				if constexpr(1u & fullsets) b = generateoffsetshelpersharedupperhalf<isdescsort, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, offsets);
+				else b = generateoffsetshelpernotshared<isdescsort, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, offsets);
 				paritybool ^= b;
 				skipsteps |= b;
 			}
@@ -12750,12 +12725,12 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 			// both or none of the top sets of the halves (which are using typeradixremainder<T>) are shared between the main and companion thread here
 			// handle the topmost 2 + 1 for 80-bit, or the topmost 1 for other types first
 			if constexpr(isabsvalue && issignmode){// start off with signed absolute handling on the top, split it up if absolute mode is used
-				unsigned b{generateoffsetshelpersharedupperhalf<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase)};
+				unsigned b{generateoffsetshelpersharedupperhalf<isdescsort, isabsvalue, issignmode, isfltpmode, T, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase)};
 				paritybool ^= b;
 				skipsteps = b << (offsetsloopcount<T> - 1u);
 				if constexpr(80u == typebitsize<T>){// handle this set like regular unsigned
 					tbase -= 1u << 8u;
-					unsigned bhi{generateoffsetshelpersharedupperhalf<isdescsort, false, false, false, false, T, X, 8u>(count, tbase)};
+					unsigned bhi{generateoffsetshelpersharedupperhalf<isdescsort, false, false, false, T, X, 8u>(count, tbase)};
 					tbase -= ((offsetsloopcountsplitup<T> - 1u) << typeradix<T>) + (2u << typeradixremainder<T>);
 					paritybool ^= bhi;
 					skipsteps = bhi << (offsetsloopcount<T> - 2u);
@@ -12764,7 +12739,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 			}else if constexpr(80u == typebitsize<T>){// handle this set like regular unsigned
 				tbase -= 1u << 8u;
-				unsigned bhi{generateoffsetshelpernotshared<isdescsort, false, false, false, false, T, X, 8u>(count, tbase)};
+				unsigned bhi{generateoffsetshelpernotshared<isdescsort, false, false, false, T, X, 8u>(count, tbase)};
 				tbase -= ((offsetsloopcountsplitup<T> - 1u) << typeradix<T>) + (2u << typeradixremainder<T>);
 				paritybool ^= bhi;
 				skipsteps = bhi << (offsetsloopcount<T> - 2u);
@@ -12775,8 +12750,8 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 			// handle the body sets, but skip the lowest set if the absolute floating-point special mode is active, since that will be handled last
 			{// handle this set like regular unsigned
 				unsigned b;
-				if constexpr(80u != typebitsize<T> && isabsvalue && issignmode) b = generateoffsetshelpersharedupperhalf<isdescsort, false, false, false, false, T, X, typeradixremainder<T>>(count, tbase);
-				else b = generateoffsetshelpernotshared<isdescsort, false, false, false, false, T, X, typeradixremainder<T>>(count, tbase);
+				if constexpr(80u != typebitsize<T> && isabsvalue && issignmode) b = generateoffsetshelpersharedupperhalf<isdescsort, false, false, false, T, X, typeradixremainder<T>>(count, tbase);
+				else b = generateoffsetshelpernotshared<isdescsort, false, false, false, T, X, typeradixremainder<T>>(count, tbase);
 				tbase -= 1u << typeradix<T>;
 				paritybool ^= b;
 				skipsteps = b << (offsetsloopcountsplitup<T> - 1u);
@@ -12784,21 +12759,21 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 			if constexpr(1u + (isabsvalue && !issignmode && isfltpmode) < offsetsloopcountsplitup<T>){
 				signed k{static_cast<signed>(offsetsloopcountsplitup<T> - 2u)};
 				do RSBD8_LIKELY{// handle these sets like regular unsigned
-					unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, false, T, X, typeradix<T>>(count, tbase)};
+					unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, T, X, typeradix<T>>(count, tbase)};
 					tbase -= 1u << typeradix<T>;
 					paritybool ^= b;
 					skipsteps |= b << k;
 					--k;
 				}while((isabsvalue && !issignmode && isfltpmode)? 0 < k : 0 <= k);
 			}else if constexpr(1u + (isabsvalue && !issignmode && isfltpmode) == offsetsloopcountsplitup<T>){// handle this set like regular unsigned
-				unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, false, T, X, typeradix<T>>(count, tbase)};
+				unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, T, X, typeradix<T>>(count, tbase)};
 				//tbase -= 1u << typeradix<T>; not necessary since this is the last set in the body
 				paritybool ^= b;
 				skipsteps |= b << static_cast<unsigned>(isabsvalue && !issignmode && isfltpmode);
 			}
 			// handle the final set if the absolute floating-point special mode is active
 			if constexpr(isabsvalue && !issignmode && isfltpmode){
-				unsigned b{generateoffsetshelpernotshared<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, offsets)};
+				unsigned b{generateoffsetshelpernotshared<isdescsort, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, offsets)};
 				paritybool ^= b;
 				skipsteps |= b;
 			}
@@ -30829,7 +30804,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(
 								curd, pinputlo + 1, poutputlo + 1,
 								cure, pinputhi - 2, poutputhi - 2,
-								curf, pinputlo + 2, poutputlo + 2u);
+								curf, pinputlo + 2, poutputlo + 2);
 							prefetchbackward(pinputhi - 3);
 							pinputhi -= 3;
 							prefetchwritebackward(poutputhi - 3);
@@ -31207,7 +31182,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(
 								curd, pinputlo + 1, poutputlo + 1,
 								cure, pinputhi - 2, poutputhi - 2,
-								curf, pinputlo + 2, poutputlo + 2u);
+								curf, pinputlo + 2, poutputlo + 2);
 							prefetchbackward(pinputhi - 3);
 							pinputhi -= 3;
 							prefetchbackward(poutputhi - 3);
@@ -35507,9 +35482,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else if constexpr(32u == typebitsize<T>){
 				if constexpr(isrevorder){
 					T *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT pbufferhi;
-					std::size_t initialcount;
 					if constexpr(!ismultithreadcapable){
-						initialcount = count + 1u;
 						pinputlo = input;
 						pinputhi = input + count;
 						pbufferlo = buffer;
@@ -35517,7 +35490,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
 						// architecture: limit to one at a time when there's few registers
 						std::size_t loc{initmtsliceswapsmain<(defaultgprfilesize < gprfilesize::large)? 2 : 6>(count, allowedthreads, assignedslice)};
-						initialcount = count - loc + 1u;
 						pinputlo = input + loc;
 						pinputhi = input + (count - loc);
 						pbufferlo = buffer + loc;
@@ -35636,7 +35608,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(2u << 11) + static_cast<std::size_t>(curhi)];
 						}while(pinputlo < pinputhi);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						initialcount %= 6u;
+						std::size_t initialcount{(count + 1u) % 6u};
 						if(4u & initialcount){// possibly initialise with 4 entries before the loop below
 							U cura{pinputlo[0]};
 							U curb{pinputhi[0]};
@@ -36011,9 +35983,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else if constexpr(24u == typebitsize<T>){
 				if constexpr(isrevorder){
 					T *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT pbufferhi;
-					std::size_t initialcount;
 					if constexpr(!ismultithreadcapable){
-						initialcount = count + 1u;
 						pinputlo = input;
 						pinputhi = input + count;
 						pbufferlo = buffer;
@@ -36021,7 +35991,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
 						// architecture: limit to one at a time when there's few registers
 						std::size_t loc{initmtsliceswapsmain<(defaultgprfilesize < gprfilesize::large)? 2 : 6>(count, allowedthreads, assignedslice)};
-						initialcount = count - loc + 1u;
 						pinputlo = input + loc;
 						pinputhi = input + (count - loc);
 						pbufferlo = buffer + loc;
@@ -36081,7 +36050,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(2u << 8) + static_cast<std::size_t>(curhi)];
 						}while(pinputlo < pinputhi);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						initialcount %= 6u;
+						std::size_t initialcount{(count + 1u) % 6u};
 						if(4u & initialcount){// possibly initialise with 4 entries before the loop below
 							U cura{pinputlo[0]};
 							U curb{pinputhi[0]};
@@ -36560,8 +36529,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								pinputhi[-1] = curc;
 								prefetchbackward(pinputhi - 2);
 								pinputhi -= 2;
-								prefetchwritebackward(pbufferhi - 2);
 								pbufferhi[-1] = curc;
+								prefetchwritebackward(pbufferhi - 2);
 								pbufferhi -= 2;
 							}
 							curc >>= 8;
@@ -46374,9 +46343,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else if constexpr(32u == typebitsize<T>){
 				if constexpr(isrevorder){
 					V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferhi;
-					std::size_t initialcount;
 					if constexpr(!ismultithreadcapable){
-						initialcount = count + 1u;
 						pinputlo = input;
 						pinputhi = input + count;
 						pbufferlo = buffer;
@@ -46384,7 +46351,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
 						// architecture: limit to one at a time when there's few registers
 						std::size_t loc{initmtsliceswapsmain<(defaultgprfilesize < gprfilesize::large)? 2 : 6>(count, allowedthreads, assignedslice)};
-						initialcount = count - loc + 1u;
 						pinputlo = input + loc;
 						pinputhi = input + (count - loc);
 						pbufferlo = buffer + loc;
@@ -46577,7 +46543,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(2u << 11) + static_cast<std::size_t>(curhi)];
 						}while(pinputlo < pinputhi);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						initialcount %= 6u;
+						std::size_t initialcount{(count + 1u) % 6u};
 						if(4u & initialcount){// possibly initialise with 4 entries before the loop below
 							V *RSBD8_RESTRICT pa{pinputlo[0]};
 							V *RSBD8_RESTRICT pb{pinputhi[0]};
@@ -47162,9 +47128,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else if constexpr(24u == typebitsize<T>){
 				if constexpr(isrevorder){
 					V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferhi;
-					std::size_t initialcount;
 					if constexpr(!ismultithreadcapable){
-						initialcount = count + 1u;
 						pinputlo = input;
 						pinputhi = input + count;
 						pbufferlo = buffer;
@@ -47172,7 +47136,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
 						// architecture: limit to one at a time when there's few registers
 						std::size_t loc{initmtsliceswapsmain<(defaultgprfilesize < gprfilesize::large)? 2 : 6>(count, allowedthreads, assignedslice)};
-						initialcount = count - loc + 1u;
 						pinputlo = input + loc;
 						pinputhi = input + (count - loc);
 						pbufferlo = buffer + loc;
@@ -47266,7 +47229,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(2u << 8) + static_cast<std::size_t>(curhi)];
 						}while(pinputlo < pinputhi);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						initialcount %= 6u;
+						std::size_t initialcount{(count + 1u) % 6u};
 						if(4u & initialcount){// possibly initialise with 4 entries before the loop below
 							V *RSBD8_RESTRICT pa{pinputlo[0]};
 							V *RSBD8_RESTRICT pb{pinputhi[0]};
@@ -49006,7 +48969,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// transform counts into base offsets
 	// slice 0 is handled by the main thread, and slice 1 by the companion thread
-	std::uintptr_t allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pzeroedindices[-1].data())};// isrevorder is set to false because it's useless when not using indirection
+	std::uintptr_t allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, typeradix<T>>(count, pzeroedindices[-1].data())};
 
 	// barrier and allareidentical value exchange with the main thread
 	allareidentical = ~allareidentical;// send over a -1 or a -2
