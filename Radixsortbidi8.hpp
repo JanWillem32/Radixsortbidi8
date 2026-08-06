@@ -1,6 +1,6 @@
 ﻿#pragma once
 // MIT License
-// Copyright (c) 2025 Jan-Willem Krans (janwillem32 <at> hotmail <dot> com)
+// Copyright (c) 2025-2026 Jan-Willem Krans (janwillem32 <at> hotmail <dot> com)
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -333,13 +333,11 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 // ## Notes on ongoing research and development
 //
 // ### TODO, add support for types larger than 128 bits
-// - TODO, currently all functions here are guarded with an upper limit of 8-, 64-, 80, 96- or 128-bit (using std::enable_if sections). Future functionality will either require lifting the limits on current functions, or adding another set of functions for the larger data types. Given that radix sort variants excel at processing large data types compared to comparison-based sorting methods, do give this some priority in development.
+// - TODO, currently all functions here are guarded with an upper limit of 8-, 64-, 80-, 96- or 128-bit (using std::enable_if sections). Future functionality will either require lifting the limits on current functions, or adding another set of functions for the larger data types. Given that radix sort variants excel at processing large data types compared to comparison-based sorting methods, do give this some priority in development.
 //
 // ### TODO, document computer system architecture-dependent code parts and add more options
 // - TODO, add support for native 128-bit for architectures that support these. (meaning: a system with 128 bits in single general-purpose registers)
 // - TODO, investigate SIMD, in all of its shapes and sizes. Some experimentation has been done with x64+AVX-512 in an early version, but compared to other optimisations and strategies it never yielded much for these test functions.
-// - TODO, the current version of this library does not provide much optimisation for processing any 64-bit (or larger) types on 32-bit systems at all. This can be documented, and later on optimised.
-// - TODO, similarly, 16-bit systems still exist. (Even though these often do include a capable 32-bit capable data path line, see the history of x86 in this regard for example.) If this library can be optimised for use in a reasonably current 16-bit microcontroller, document and later on optimise for it.
 // - TODO, add more platform-dependent, optimised code sequences here similar to the current collections in the rsbd8::helper namespace.
 // - TODO, test and debug this library on more machines, platforms and such. Functionality and performance should both be guaranteed.
 //
