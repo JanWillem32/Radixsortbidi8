@@ -6,9 +6,6 @@
 
 // WindowsProject1.cpp : Defines the entry point for the application.
 #include "pch.h"
-#include <Aclapi.h>
-#include <tlhelp32.h>
-#include <cmath>
 
 // This test suite and the library header allows some configuration with a few constants and macros.
 // The library itself does not require any of its macros to be defined for normal operation.
@@ -56,6 +53,8 @@ static std::size_t constexpr RSBD8_TEST_BATCH_SIZE[]{8uz * 1024 * 1024 * 1024, 8
 #include "..\..\Radixsortbidi8.hpp"
 #include <execution>
 #include <algorithm>
+#include <Aclapi.h>
+#include <tlhelp32.h>
 
 // disable warning messages for this file only:
 // C4559: 'x': redefinition; the function gains __declspec(noalias)
