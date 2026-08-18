@@ -4,12 +4,11 @@
 // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#include <iostream>
 #include "../Radixsortbidi8.hpp"
 
 int main(){
 	std::uint32_t simple[]{18, 33, 21, 0, 5, 1, 13};
-	bool succeeded{rsbd8::radixsort(_countof(simple), simple)};
+	bool succeeded{rsbd8::radixsort(std::size(simple), simple)};
 	assert(succeeded);
 	assert(0 == simple[0]);
 	assert(1 == simple[1]);
@@ -30,8 +29,9 @@ int main(){
 			{0, 1u},// min normal
 			{0xFFFFFFFFFFFFFFFFu, 0},// max subnormal
 			{1u, 0}};// min subnormal
-		rsbd8::helper::longdoubletest80<false, true, true> ajo80[_countof(aji80)];
-		rsbd8::radixsortcopy(_countof(aji80), aji80, ajo80);
+		rsbd8::helper::longdoubletest80<false, true, true> ajo80[std::size(aji80)];
+		bool succeededt0{rsbd8::radixsortcopy(std::size(aji80), aji80, ajo80)};
+		assert(succeededt0);
 		assert(ajo80[0].mantissa == 0x8000000000000000u && ajo80[0].signexponent == 0xFFFFu);// QNaN, machine indeterminate
 		assert(ajo80[1].mantissa == 0 && ajo80[1].signexponent == 0xFFFFu);// -inf
 		assert(ajo80[2].mantissa == 1u && ajo80[2].signexponent == 0);// min subnormal
@@ -40,7 +40,8 @@ int main(){
 		assert(ajo80[5].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo80[5].signexponent == 0x7FFEu);// max normal
 		assert(ajo80[6].mantissa == 0 && ajo80[6].signexponent == 0x7FFFu);// +inf
 
-		rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(_countof(aji80), aji80, ajo80);
+		bool succeededt1{rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(std::size(aji80), aji80, ajo80)};
+		assert(succeededt1);
 		assert(ajo80[0].mantissa == 0 && ajo80[0].signexponent == 0x7FFFu);// +inf
 		assert(ajo80[1].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo80[1].signexponent == 0x7FFEu);// max normal
 		assert(ajo80[2].mantissa == 0 && ajo80[2].signexponent == 1u);// min normal
@@ -57,8 +58,9 @@ int main(){
 			{0, 0xFFF80001u},// min normal
 			{0xFFFFFFFFFFFFFFFFu, 0xC7C80000u},// max subnormal
 			{1u, 0xB3710000u}};// min subnormal
-		rsbd8::helper::longdoubletest96<false, true, true> ajo96[_countof(aji96)];
-		rsbd8::radixsortcopy(_countof(aji96), aji96, ajo96);
+		rsbd8::helper::longdoubletest96<false, true, true> ajo96[std::size(aji96)];
+		bool succeededt2{rsbd8::radixsortcopy(std::size(aji96), aji96, ajo96)};
+		assert(succeededt2);
 		assert(ajo96[0].mantissa == 0x8000000000000000u && ajo96[0].signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
 		assert(ajo96[1].mantissa == 0 && ajo96[1].signexponent == 0xABABFFFFu);// -inf
 		assert(ajo96[2].mantissa == 1u && ajo96[2].signexponent == 0xB3710000u);// min subnormal
@@ -67,7 +69,8 @@ int main(){
 		assert(ajo96[5].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo96[5].signexponent == 0x01017FFEu);// max normal
 		assert(ajo96[6].mantissa == 0 && ajo96[6].signexponent == 0xD0017FFFu);// +inf
 
-		rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(_countof(aji96), aji96, ajo96);
+		bool succeededt3{rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(std::size(aji96), aji96, ajo96)};
+		assert(succeededt3);
 		assert(ajo96[0].mantissa == 0 && ajo96[0].signexponent == 0xD0017FFFu);// +inf
 		assert(ajo96[1].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo96[1].signexponent == 0x01017FFEu);// max normal
 		assert(ajo96[2].mantissa == 0 && ajo96[2].signexponent == 0xFFF80001u);// min normal
@@ -84,8 +87,9 @@ int main(){
 			{0, 0x88887777FFF80001u},// min normal
 			{0xFFFFFFFFFFFFFFFFu, 0xCCCC9999C7C80000u},// max subnormal
 			{1u, 0xFFFFDDDDB3710000u}};// min subnormal
-		rsbd8::helper::longdoubletest128<false, true, true> ajo128[_countof(aji128)];
-		rsbd8::radixsortcopy(_countof(aji128), aji128, ajo128);
+		rsbd8::helper::longdoubletest128<false, true, true> ajo128[std::size(aji128)];
+		bool succeededt4{rsbd8::radixsortcopy(std::size(aji128), aji128, ajo128)};
+		assert(succeededt4);
 		assert(ajo128[0].mantissa == 0x8000000000000000u && ajo128[0].signexponent == 0x44443333EEEEFFFFu);// QNaN, machine indeterminate
 		assert(ajo128[1].mantissa == 0 && ajo128[1].signexponent == 0xBBBBAAAAABABFFFFu);// -inf
 		assert(ajo128[2].mantissa == 1u && ajo128[2].signexponent == 0xFFFFDDDDB3710000u);// min subnormal
@@ -94,7 +98,8 @@ int main(){
 		assert(ajo128[5].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo128[5].signexponent == 0x6666555501017FFEu);// max normal
 		assert(ajo128[6].mantissa == 0 && ajo128[6].signexponent == 0x22221111D0017FFFu);// +inf
 
-		rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(_countof(aji128), aji128, ajo128);
+		bool succeededt5{rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(std::size(aji128), aji128, ajo128)};
+		assert(succeededt5);
 		assert(ajo128[0].mantissa == 0 && ajo128[0].signexponent == 0x22221111D0017FFFu);// +inf
 		assert(ajo128[1].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo128[1].signexponent == 0x6666555501017FFEu);// max normal
 		assert(ajo128[2].mantissa == 0 && ajo128[2].signexponent == 0x88887777FFF80001u);// min normal
@@ -105,9 +110,10 @@ int main(){
 
 		// basic indirect sorting tests with the 80-bit long double types
 
-		rsbd8::helper::longdoubletest80<false, true, true> *ako80[_countof(aji80)], *aki80[_countof(aji80)]{
+		rsbd8::helper::longdoubletest80<false, true, true> *ako80[std::size(aji80)], *aki80[std::size(aji80)]{
 			aji80, aji80 + 1, aji80 + 2, aji80 + 3, aji80 + 4, aji80 + 5, aji80 + 6};// indirect input
-		rsbd8::radixsortcopy(_countof(aki80), aki80, ako80);
+		bool succeededt6{rsbd8::radixsortcopy(std::size(aki80), aki80, ako80)};
+		assert(succeededt6);
 		assert(ako80[0]->mantissa == 0x8000000000000000u && ako80[0]->signexponent == 0xFFFFu);// QNaN, machine indeterminate
 		assert(ako80[1]->mantissa == 0 && ako80[1]->signexponent == 0xFFFFu);// -inf
 		assert(ako80[2]->mantissa == 1u && ako80[2]->signexponent == 0);// min subnormal
@@ -116,7 +122,8 @@ int main(){
 		assert(ako80[5]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako80[5]->signexponent == 0x7FFEu);// max normal
 		assert(ako80[6]->mantissa == 0 && ako80[6]->signexponent == 0x7FFFu);// +inf
 
-		rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(_countof(aki80), aki80, ako80);
+		bool succeededt7{rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(std::size(aki80), aki80, ako80)};
+		assert(succeededt7);
 		assert(ako80[0]->mantissa == 0 && ako80[0]->signexponent == 0x7FFFu);// +inf
 		assert(ako80[1]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako80[1]->signexponent == 0x7FFEu);// max normal
 		assert(ako80[2]->mantissa == 0 && ako80[2]->signexponent == 1u);// min normal
@@ -125,9 +132,10 @@ int main(){
 		assert(ako80[5]->mantissa == 0 && ako80[5]->signexponent == 0xFFFFu);// -inf
 		assert(ako80[6]->mantissa == 0x8000000000000000u && ako80[6]->signexponent == 0xFFFFu);// QNaN, machine indeterminate
 
-		rsbd8::helper::longdoubletest96<false, true, true> *ako96[_countof(aji96)], *aki96[_countof(aji96)]{
+		rsbd8::helper::longdoubletest96<false, true, true> *ako96[std::size(aji96)], *aki96[std::size(aji96)]{
 			aji96, aji96 + 1, aji96 + 2, aji96 + 3, aji96 + 4, aji96 + 5, aji96 + 6};// indirect input
-		rsbd8::radixsortcopy(_countof(aki96), aki96, ako96);
+		bool succeededt8{rsbd8::radixsortcopy(std::size(aki96), aki96, ako96)};
+		assert(succeededt8);
 		assert(ako96[0]->mantissa == 0x8000000000000000u && ako96[0]->signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
 		assert(ako96[1]->mantissa == 0 && ako96[1]->signexponent == 0xABABFFFFu);// -inf
 		assert(ako96[2]->mantissa == 1u && ako96[2]->signexponent == 0xB3710000u);// min subnormal
@@ -136,7 +144,8 @@ int main(){
 		assert(ako96[5]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako96[5]->signexponent == 0x01017FFEu);// max normal
 		assert(ako96[6]->mantissa == 0 && ako96[6]->signexponent == 0xD0017FFFu);// +inf
 
-		rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(_countof(aki96), aki96, ako96);
+		bool succeededt9{rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(std::size(aki96), aki96, ako96)};
+		assert(succeededt9);
 		assert(ako96[0]->mantissa == 0 && ako96[0]->signexponent == 0xD0017FFFu);// +inf
 		assert(ako96[1]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako96[1]->signexponent == 0x01017FFEu);// max normal
 		assert(ako96[2]->mantissa == 0 && ako96[2]->signexponent == 0xFFF80001u);// min normal
@@ -145,9 +154,10 @@ int main(){
 		assert(ako96[5]->mantissa == 0 && ako96[5]->signexponent == 0xABABFFFFu);// -inf
 		assert(ako96[6]->mantissa == 0x8000000000000000u && ako96[6]->signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
 
-		rsbd8::helper::longdoubletest128<false, true, true> *ako128[_countof(aji128)], *aki128[_countof(aji128)]{
+		rsbd8::helper::longdoubletest128<false, true, true> *ako128[std::size(aji128)], *aki128[std::size(aji128)]{
 			aji128, aji128 + 1, aji128 + 2, aji128 + 3, aji128 + 4, aji128 + 5, aji128 + 6};// indirect input
-		rsbd8::radixsortcopy(_countof(aki128), aki128, ako128);
+		bool succeededt10{rsbd8::radixsortcopy(std::size(aki128), aki128, ako128)};
+		assert(succeededt10);
 		assert(ako128[0]->mantissa == 0x8000000000000000u && ako128[0]->signexponent == 0x44443333EEEEFFFFu);// QNaN, machine indeterminate
 		assert(ako128[1]->mantissa == 0 && ako128[1]->signexponent == 0xBBBBAAAAABABFFFFu);// -inf
 		assert(ako128[2]->mantissa == 1u && ako128[2]->signexponent == 0xFFFFDDDDB3710000u);// min subnormal
@@ -156,7 +166,8 @@ int main(){
 		assert(ako128[5]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako128[5]->signexponent == 0x6666555501017FFEu);// max normal
 		assert(ako128[6]->mantissa == 0 && ako128[6]->signexponent == 0x22221111D0017FFFu);// +inf
 
-		rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(_countof(aki128), aki128, ako128);
+		bool succeededt11{rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(std::size(aki128), aki128, ako128)};
+		assert(succeededt11);
 		assert(ako128[0]->mantissa == 0 && ako128[0]->signexponent == 0x22221111D0017FFFu);// +inf
 		assert(ako128[1]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako128[1]->signexponent == 0x6666555501017FFEu);// max normal
 		assert(ako128[2]->mantissa == 0 && ako128[2]->signexponent == 0x88887777FFF80001u);// min normal
@@ -178,41 +189,46 @@ int main(){
 			$Y, $Z, $$, $_};// 60
 		// test sequence 0B_iqUE (oblique), with one item from each row; 0:0, 10:i, 20:q, 30:B, 40:E, 50:U, 60:_
 		static cert_v_binencoding64 constexpr tein[7]{$0, $B, $_, $i, $q, $U, $E};
-		cert_v_binencoding64 teout[_countof(tein)];
-		rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(_countof(tein), tein, teout);
+		cert_v_binencoding64 teout[std::size(tein)];
+		bool succeededt0{rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(std::size(tein), tein, teout)};
+		assert(succeededt0);
 		assert(teout[0] == $_ && teout[1] == $U && teout[2] == $E && teout[3] == $B && teout[4] == $q && teout[5] == $i && teout[6] == $0);
-		rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder>(_countof(tein), tein, teout);
+		bool succeededt1{rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder>(std::size(tein), tein, teout)};
+		assert(succeededt1);
 		assert(teout[0] == $0 && teout[1] == $i && teout[2] == $q && teout[3] == $B && teout[4] == $E && teout[5] == $U && teout[6] == $_);
 
-		// 1 unit test: radixsort(), write to buffer, float (multi-byte), no indirection, (implicit template statement) ascending
+		// 1 unit test: write to output, float (multi-byte), no indirection, (implicit template statement) ascending
 		std::uint32_t inm[7]{8, 0, 3, 1u << 31 | 2, 3, 1u << 31 | 18, 1u << 31 | 2};
-		std::uint32_t outm[_countof(inm)];
-		rsbd8::radixsortcopy(_countof(inm), reinterpret_cast<float *>(inm), reinterpret_cast<float *>(outm));
+		std::uint32_t outm[std::size(inm)];
+		bool succeededt2{rsbd8::radixsortcopy(std::size(inm), reinterpret_cast<float *>(inm), reinterpret_cast<float *>(outm))};
+		assert(succeededt2);
 		assert(outm[0] == (1u << 31 | 18) && outm[1] == (1u << 31 | 2) && outm[2] == (1u << 31 | 2) && outm[3] == 0 && outm[4] == 3 && outm[5] == 3 && outm[6] == 8);
 
 		// 2 unit test, the same as above, but indirect
 		std::uint32_t const *inim[7]{outm + 6, outm + 3, outm + 4, outm + 1, outm + 5, outm, outm + 2};
-		std::uint32_t const *outim[_countof(inim)];
-		rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(_countof(inim), reinterpret_cast<float const *const *>(inim), reinterpret_cast<float const **>(outim));
+		std::uint32_t const *outim[std::size(inim)];
+		bool succeededt3{rsbd8::radixsortcopy<rsbd8::sortingdirection::dscrevorder>(std::size(inim), reinterpret_cast<float const *const *>(inim), reinterpret_cast<float const **>(outim))};
+		assert(succeededt3);
 		assert(outim[0] == inim[0] && outim[1] == inim[4] && outim[2] == inim[2] && outim[3] == inim[1] && outim[4] == inim[6] && outim[5] == inim[3] && outim[6] == inim[5]);
-		rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder>(_countof(inim), reinterpret_cast<float const **>(inim), reinterpret_cast<float const **>(outim));
+		bool succeededt4{rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder>(std::size(inim), reinterpret_cast<float const **>(inim), reinterpret_cast<float const **>(outim))};
+		assert(succeededt4);
 		assert(*outim[0] == (1u << 31 | 18) && *outim[1] == (1u << 31 | 2) && *outim[2] == (1u << 31 | 2) && *outim[3] == 0 && *outim[4] == 3 && *outim[5] == 3 && *outim[6] == 8);
 
 		// 6 groups of short unit tests: radixsortcopynoalloc() (and one directly to its implementation), 8-byte with first level getter indirection, (implicit template statement) ascending
 		// Part of this test is firing up the debugger in "release mode" to see how well the inlining parallel processing fares, or just read the asm output functions directly. (This generates quite a few similar functions for the various cases though.)
-#pragma pack(push, 1)
+#pragma pack(push, 1)// note: do not use this kind of item on an alignment machine...
 		class Testmeclass{
 			std::uint64_t wasted{};// unused, default to zero for this test class
 			char misalignoffset{};// unused, default to zero for this test class
 		public:
 			std::uint64_t co;
 			std::int64_t sco;
-			constexpr __forceinline std::uint64_t get()const noexcept{return{co};};
-			constexpr __forceinline std::uint64_t getwparam(int)const noexcept{return{co};};
-			constexpr __forceinline std::uint64_t bget()noexcept{return{co};};
-			constexpr __forceinline std::int64_t sget()const noexcept{return{sco};};
-			constexpr __forceinline std::int64_t zget()noexcept{return{sco};};
-			constexpr __forceinline Testmeclass(std::uint64_t input)noexcept : co{input}, sco{static_cast<std::int64_t>(input) - 1} {};
+			constexpr inline std::uint64_t get()const noexcept{return{co};};
+			constexpr inline std::uint64_t getwparam(int testfor8in)const noexcept{assert(8 == testfor8in); static_cast<void>(testfor8in); return{co};};
+			constexpr inline std::uint64_t bget()noexcept{return{co};};
+			constexpr inline std::int64_t sget()const noexcept{return{sco};};
+			constexpr inline std::int64_t zget()noexcept{return{sco};};
+			constexpr inline Testmeclass(std::uint64_t input)noexcept : co{input}, sco{static_cast<std::int64_t>(input) - 1} {};
 		};
 #pragma pack(pop)
 		static std::size_t constexpr sizecontainer{sizeof(Testmeclass)};
@@ -223,38 +239,69 @@ int main(){
 		static_assert(17 == offsetsco);
 
 		Testmeclass cin[]{8, 0, 6, 4, 0, 2, 6};
-		Testmeclass const *fin[_countof(cin)]{cin, cin + 1, cin + 2, cin + 3, cin + 4, cin + 5, cin + 6};
-		Testmeclass const *fout[_countof(cin)];
+		Testmeclass const *fin[std::size(cin)]{cin, cin + 1, cin + 2, cin + 3, cin + 4, cin + 5, cin + 6};
+		Testmeclass const *fout[std::size(cin)];
 
-		rsbd8::radixsortcopy<&Testmeclass::get>(_countof(fin), fin, fout);
-		rsbd8::radixsortcopy<&Testmeclass::getwparam>(_countof(fin), fin, fout, 0, 8);
-		rsbd8::radixsortcopy<&Testmeclass::co>(_countof(fin), fin, fout);
-		rsbd8::radixsortcopy<std::uint64_t, 9>(_countof(fin), fin, fout);
+		bool succeededt5{rsbd8::radixsortcopy<&Testmeclass::get>(std::size(fin), fin, fout)};
+		assert(succeededt5);
+		bool succeededt6{rsbd8::radixsortcopy<&Testmeclass::getwparam>(std::size(fin), fin, fout,
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
+			0,
+#elif defined(_POSIX_C_SOURCE)
+			MAP_ANONYMOUS | MAP_PRIVATE,
+#endif
+			8)};
+		assert(succeededt6);
 
-		rsbd8::radixsortcopy<&Testmeclass::sget>(_countof(fin), fin, fout);
-		rsbd8::radixsortcopy<&Testmeclass::sco>(_countof(fin), fin, fout);
-		rsbd8::radixsortcopy<std::int64_t, 17>(_countof(fin), fin, fout);
+		bool succeededt7{rsbd8::radixsortcopy<&Testmeclass::co>(std::size(fin), fin, fout)};
+		assert(succeededt7);
+		bool succeededt8{rsbd8::radixsortcopy<std::uint64_t, 9>(std::size(fin), fin, fout)};
+		assert(succeededt8);
+
+		bool succeededt9{rsbd8::radixsortcopy<&Testmeclass::sget>(std::size(fin), fin, fout)};
+		assert(succeededt9);
+		bool succeededt10{rsbd8::radixsortcopy<&Testmeclass::sco>(std::size(fin), fin, fout)};
+		assert(succeededt10);
+		bool succeededt11{rsbd8::radixsortcopy<std::int64_t, 17>(std::size(fin), fin, fout)};
+		assert(succeededt11);
 
 		// correctly fails to compile (not const-correct):
-		//rsbd8::radixsortcopy<&Testmeclass::bget>(_countof(fin), fin, fout);
+		//bool succeededt12{rsbd8::radixsortcopy<&Testmeclass::bget>(std::size(fin), fin, fout)};
+		//assert(succeededt12);
 		// correctly fails to compile (not const-correct):
-		//rsbd8::radixsortcopy<&Testmeclass::zget>(_countof(fin), fin, fout);
+		//bool succeededt13{rsbd8::radixsortcopy<&Testmeclass::zget>(std::size(fin), fin, fout)};
+		//assert(succeededt13);
 
-		Testmeclass *yin[_countof(cin)]{cin, cin + 1, cin + 2, cin + 3, cin + 4, cin + 5, cin + 6};
-		Testmeclass *yout[_countof(cin)];
+		Testmeclass *yin[std::size(cin)]{cin, cin + 1, cin + 2, cin + 3, cin + 4, cin + 5, cin + 6};
+		Testmeclass *yout[std::size(cin)];
 
-		rsbd8::radixsortcopy<&Testmeclass::get>(_countof(yin), yin, yout);
-		rsbd8::radixsortcopy<&Testmeclass::getwparam>(_countof(yin), yin, yout, 0, 8);
-		rsbd8::radixsortcopy<&Testmeclass::co>(_countof(yin), yin, yout);
-		rsbd8::radixsortcopy<std::uint64_t, 9>(_countof(yin), yin, yout);
+		bool succeededt14{rsbd8::radixsortcopy<&Testmeclass::get>(std::size(yin), yin, yout)};
+		assert(succeededt14);
+		bool succeededt15{rsbd8::radixsortcopy<&Testmeclass::getwparam>(std::size(yin), yin, yout,
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
+			0,
+#elif defined(_POSIX_C_SOURCE)
+			MAP_ANONYMOUS | MAP_PRIVATE,
+#endif
+			8)};
+		assert(succeededt15);
+		bool succeededt16{rsbd8::radixsortcopy<&Testmeclass::co>(std::size(yin), yin, yout)};
+		assert(succeededt16);
+		bool succeededt17{rsbd8::radixsortcopy<std::uint64_t, 9>(std::size(yin), yin, yout)};
+		assert(succeededt17);
 
-		rsbd8::radixsortcopy<&Testmeclass::sget>(_countof(yin), yin, yout);
-		rsbd8::radixsortcopy<&Testmeclass::sco>(_countof(yin), yin, yout);
-		rsbd8::radixsortcopy<std::int64_t, 17>(_countof(yin), yin, yout);
+		bool succeededt18{rsbd8::radixsortcopy<&Testmeclass::sget>(std::size(yin), yin, yout)};
+		assert(succeededt18);
+		bool succeededt19{rsbd8::radixsortcopy<&Testmeclass::sco>(std::size(yin), yin, yout)};
+		assert(succeededt19);
+		bool succeededt20{rsbd8::radixsortcopy<std::int64_t, 17>(std::size(yin), yin, yout)};
+		assert(succeededt20);
 
 		// unlike the commented calls above, these work as intended:
-		rsbd8::radixsortcopy<&Testmeclass::bget>(_countof(yin), yin, yout);
-		rsbd8::radixsortcopy<&Testmeclass::zget>(_countof(yin), yin, yout);
+		bool succeededt21{rsbd8::radixsortcopy<&Testmeclass::bget>(std::size(yin), yin, yout)};
+		assert(succeededt21);
+		bool succeededt22{rsbd8::radixsortcopy<&Testmeclass::zget>(std::size(yin), yin, yout)};
+		assert(succeededt22);
 
 		// TODO: add more unit tests
 	}

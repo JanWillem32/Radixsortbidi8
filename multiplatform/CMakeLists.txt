@@ -11,8 +11,6 @@ add_compile_definitions(
 	"WIN32_LEAN_AND_MEAN"
 	"VC_EXTRALEAN"
 )
-else()
-add_compile_options(-fpermissive -Wa,-mbig-obj)
 endif()
 
 else()
@@ -26,7 +24,7 @@ add_compile_definitions(
 	"VC_EXTRALEAN"
 )
 else()
-add_compile_options(-Ofast -fpermissive -Wa,-mbig-obj -save-temps)
+add_compile_options(-Ofast -save-temps)
 endif()
 endif()
 
