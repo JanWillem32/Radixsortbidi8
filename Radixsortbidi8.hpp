@@ -13023,7 +13023,11 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
 	static double constexpr intermediate{base + static_cast<double>(PTRDIFF_MIN) + ((-static_cast<double>(PTRDIFF_MIN) > base)? -.5 : .5)};
 	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating-point
-	static std::size_t constexpr intermediatefiltered{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
+	static std::size_t constexpr intermediatefiltered{
+#if !defined(RSBD8_THREAD_MINIMUM) || 2 > RSBD8_THREAD_MINIMUM
+		static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)
+#endif
+	};
 	// with very low counts, do not allow multithreading unless the prefetch stride can be guaranteed
 	return{std::max(intermediatefiltered, std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / (isindirect? sizeof(void *) : sizeof(T))))};
 }
@@ -13096,9 +13100,14 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
 	static double constexpr intermediate{base + static_cast<double>(PTRDIFF_MIN) + ((-static_cast<double>(PTRDIFF_MIN) > base)? -.5 : .5)};
 	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating-point
-	static std::size_t constexpr intermediatefiltered{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
-	// with very low counts, do not allow multithreading unless the prefetch stride can be guaranteed
-	return{std::max(intermediatefiltered, 3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / (isindirect? sizeof(void *) : sizeof(T))))};
+	static std::size_t constexpr intermediatefiltered{
+#if !defined(RSBD8_THREAD_MINIMUM) || 4 > RSBD8_THREAD_MINIMUM
+		static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)
+#endif
+	};
+	// the factor of 3 here is based on the maximum distribution: the main 2-way multithreading function, followed up by a 3-way merge (a baseline of 6 threads)
+	// no special factor of 2 is implemented here even though a distribution of 4 is implemented in the code
+	return{std::max(intermediatefiltered, 3u * base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, isindirect>())};
 }
 
 // function to establish the initial treshold for 8-, 12- and 18-way multithreading
@@ -13132,9 +13141,14 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
 	static double constexpr intermediate{base + static_cast<double>(PTRDIFF_MIN) + ((-static_cast<double>(PTRDIFF_MIN) > base)? -.5 : .5)};
 	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating-point
-	static std::size_t constexpr intermediatefiltered{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
-	// with very low counts, do not allow multithreading unless the prefetch stride can be guaranteed
-	return{std::max(intermediatefiltered, 9u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / (isindirect? sizeof(void *) : sizeof(T))))};
+	static std::size_t constexpr intermediatefiltered{
+#if !defined(RSBD8_THREAD_MINIMUM) || 8 > RSBD8_THREAD_MINIMUM
+		static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)
+#endif
+	};
+	// the factor of 9 here is based on the maximum distribution: the main 2-way multithreading function, followed up by a 3-way merge, twice (a baseline of 18 threads)
+	// no special factors of 4 or 6 are implemented here even though distributions of 8 and 12 are implemented in the code
+	return{std::max(intermediatefiltered, 9u * base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, isindirect>())};
 }
 
 // Function implementation templates for 80-bit-based long double types without indirection
@@ -13151,7 +13165,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// if isrevorder and isinputconst are set, the parameter is used for T *RSBD8_RESTRICT pdst
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128u == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pout);
 	if constexpr(isrevorder && isinputconst){
 		assert(input != splitparameter<false>(std::forward<vararguments>(varparameters)...));
@@ -13625,7 +13638,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocmultisortmtc(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128u == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
 	assert(pdst != pdstnext);
 	// do not pass a nullptr here
@@ -14580,10 +14592,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != output);
 	assert(input != buffer);
@@ -14610,7 +14623,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(T))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -15125,10 +15138,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -15152,7 +15166,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(T))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -15678,7 +15692,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		>
 #endif
 		;// assume zero-extension to be basically free for U on basically all modern machines
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pout);
 	if constexpr(isrevorder && isinputconst){
 		assert(input != splitparameter<false>(std::forward<vararguments>(varparameters)...));
@@ -16152,7 +16165,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		>
 #endif
 		;// assume zero-extension to be basically free for U on basically all modern machines
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
 	assert(pdst != pdstnext);
 	// do not pass a nullptr here
@@ -17489,10 +17501,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != output);
 	assert(input != buffer);
@@ -17524,7 +17537,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(V *))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -18266,10 +18279,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way < count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -18298,7 +18312,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(V *))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -19045,7 +19059,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			HI = 0u;
 		}
 	}
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pout);
 	if constexpr(isrevorder && isinputconst){
 		assert(input != splitparameter<false>(std::forward<vararguments>(varparameters)...));
@@ -19399,7 +19412,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			HI = 0u;
 		}
 	}
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
 	assert(pdst != pdstnext);
 	// do not pass a nullptr here
@@ -19908,10 +19920,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != output);
 	assert(input != buffer);
@@ -19938,7 +19951,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(T))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -20420,10 +20433,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -20447,7 +20461,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(T))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -20863,7 +20877,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			HI = 0u;
 		}
 	}
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pout);
 	if constexpr(isrevorder && isinputconst){
 		assert(input != splitparameter<false>(std::forward<vararguments>(varparameters)...));
@@ -21217,7 +21230,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			HI = 0u;
 		}
 	}
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
 	assert(pdst != pdstnext);
 	// do not pass a nullptr here
@@ -22060,10 +22072,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != output);
 	assert(input != buffer);
@@ -22095,7 +22108,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(V *))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -22774,10 +22787,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -22806,7 +22820,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(V *))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -23401,7 +23415,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			HI = 0u;
 		}
 	}
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pout);
 	if constexpr(isrevorder && isinputconst){
 		assert(input != splitparameter<false>(std::forward<vararguments>(varparameters)...));
@@ -23957,7 +23970,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			HI = 0u;
 		}
 	}
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
 	assert(pdst != pdstnext);
 	// do not pass a nullptr here
@@ -24542,10 +24554,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != output);
 	assert(input != buffer);
@@ -24572,7 +24585,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(T))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -25080,10 +25093,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -25107,7 +25121,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(T))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -25638,7 +25652,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			HI = 0u;
 		}
 	}
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pout);
 	if constexpr(isrevorder && isinputconst){
 		assert(input != splitparameter<false>(std::forward<vararguments>(varparameters)...));
@@ -26209,7 +26222,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			HI = 0u;
 		}
 	}
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
 	assert(pdst != pdstnext);
 	// do not pass a nullptr here
@@ -27255,10 +27267,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -27288,7 +27301,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(V *))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -28074,10 +28087,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -28106,7 +28120,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(V *))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -28905,7 +28919,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	void> radixsortnoallocmultiinitmt(std::size_t count, unsigned allowedthreads, unsigned assignedslice, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> &offsetscompanion, std::conditional_t<isinputconst, T const, T> *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pout, vararguments&&... varparameters)noexcept{
 	// if isrevorder and isinputconst are set, the parameter is used for T *RSBD8_RESTRICT pdst
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pout);
 	if constexpr(isrevorder && isinputconst){
 		assert(input != splitparameter<false>(std::forward<vararguments>(varparameters)...));
@@ -31635,7 +31648,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8u < CHAR_BIT * sizeof(T),
 	void> radixsortnoallocmultisortmtc(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
 	assert(pdst != pdstnext);
 	// do not pass a nullptr here
@@ -32070,10 +32082,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != output);
 	assert(input != buffer);
@@ -32100,7 +32113,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(T))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -34125,10 +34138,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -34152,7 +34166,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(T))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -36749,7 +36763,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// if isrevorder and isinputconst are set, the first parameter is used for V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, and all the other ones are for the getter function
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pout);
 	if constexpr(isrevorder && isinputconst){
 		assert(input != splitparameter<false>(std::forward<vararguments>(varparameters)...));
@@ -39712,7 +39725,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocmultisortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments&&... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
 	assert(pdst != pdstnext);
 	// do not pass a nullptr here
@@ -40448,10 +40460,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != output);
 	assert(input != buffer);
@@ -40483,7 +40496,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(V *))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -44054,10 +44067,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -44086,7 +44100,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(V *))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -48283,7 +48297,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
 	void> radixsortnoallocsingleinitmt(std::size_t count, unsigned allowedthreads, unsigned assignedslice, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> &offsetscompanion, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pout)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pout);
 	// do not pass a nullptr here
 	assert(input);
@@ -48389,7 +48402,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
 	void> radixsortnoallocsinglesimpleinitmt(std::size_t count, unsigned allowedthreads, unsigned assignedslice, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> &offsetscompanion, T const *RSBD8_RESTRICT input)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	// do not pass a nullptr here
 	assert(input);
 
@@ -48463,7 +48475,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
 	void> radixsortnoallocsinglesortmtc(std::size_t count, T const *RSBD8_RESTRICT psrclo, T *RSBD8_RESTRICT pdst, X *RSBD8_RESTRICT offsetscompanion)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(psrclo != pdst);
 	// do not pass a nullptr here
 	assert(psrclo);
@@ -48532,7 +48543,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
 	void> radixsortnoallocsinglesimplesortmtc(std::size_t count, T *RSBD8_RESTRICT pdst, X const *RSBD8_RESTRICT offsets)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	// do not pass a nullptr here
 	assert(pdst);
 	assert(offsets);
@@ -49064,10 +49074,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != output);
 	// do not pass a nullptr here
@@ -49091,7 +49102,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(T))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -49343,10 +49354,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != output);
 	// do not pass a nullptr here
@@ -49370,7 +49382,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(T))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -49637,10 +49649,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -49664,7 +49677,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(T))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -49918,10 +49931,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	// do not pass a nullptr here
 	if constexpr(ismultithreadcapable) assert(pfuturesplaceholder);
@@ -49943,7 +49957,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(T))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -50095,7 +50109,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	void> radixsortnoallocsingleinitmt(std::size_t count, unsigned allowedthreads, unsigned assignedslice, offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X> &offsetscompanion, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pout, vararguments&&... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pout);
 	// do not pass a nullptr here
 	assert(input);
@@ -50239,7 +50252,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocsinglesortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrclo, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, X *RSBD8_RESTRICT offsetscompanion, vararguments&&... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(psrclo != pdst);
 	// do not pass a nullptr here
 	assert(psrclo);
@@ -50658,10 +50670,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != output);
 	// do not pass a nullptr here
@@ -50690,7 +50703,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(V *))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -51119,10 +51132,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	RSBD8_MAYBE_UNUSED unsigned allowedthreads;
 	RSBD8_MAYBE_UNUSED void *RSBD8_RESTRICT pfuturesplaceholder;
 #endif
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	if constexpr(ismultithreadcapable){
 		assert(1u < allowedthreads);// never use this function in the multithreading mode with single-threaded intent
 		assert(1u < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u < count);// small arrays are only allowed in single-threaded mode
+		assert(limit2way <= count);// small arrays are only allowed in single-threaded mode
 	}
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -51151,7 +51165,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// generate the histograms for each part, all in one go
 		if constexpr(ismultithreadcapable){
-			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(1u) << (8 - 1), (prefetchmaxstride >> 1) / sizeof(V *))));
+			allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
 			assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 			std::future<void> *RSBD8_RESTRICT pfuturesiter{reinterpret_cast<std::future<void> *RSBD8_RESTRICT>(pfuturesplaceholder)};
 			// slice 0 is handled by the main thread, and slice 1 by the companion thread
@@ -51520,13 +51534,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	auto pcall{radixsortcopynoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>};
 	if(limit2way <= count && 1u < allowedthreads)RSBD8_LIKELY{// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -51606,13 +51614,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	auto pcall{radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>};
 	if(limit2way <= count && 1u < allowedthreads)RSBD8_LIKELY{// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -51698,13 +51700,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	auto pcall{radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>};
 	if(limit2way <= count && 1u < allowedthreads)RSBD8_LIKELY{// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -51783,13 +51779,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	auto pcall{radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>};
 	if(limit2way <= count && 1u < allowedthreads)RSBD8_LIKELY{// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -51868,13 +51858,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	auto pcall{radixsortnoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>};
 	if(limit2way <= count && 1u < allowedthreads)RSBD8_LIKELY{// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -51961,13 +51945,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	auto pcall{radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>};
 	if(limit2way <= count && 1u < allowedthreads)RSBD8_LIKELY{// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -52048,13 +52026,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	auto pcall{radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>};
 	if(limit2way <= count && 1u < allowedthreads)RSBD8_LIKELY{// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -52141,13 +52113,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	auto pcall{radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>};
 	if(limit2way <= count && 1u < allowedthreads)RSBD8_LIKELY{// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -52227,13 +52193,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	auto pcall{radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>};
 	if(limit2way <= count && 1u < allowedthreads)RSBD8_LIKELY{// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -54479,7 +54439,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using U = std::conditional_t<std::is_signed_v<W> && sizeof(W) < sizeof(std::intptr_t), std::intptr_t,// sign-extend signed types for masking operations
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
 	using M = std::conditional_t<std::is_integral_v<U>, U, std::intptr_t>;// used for masking operations
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
@@ -54858,7 +54817,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using U = std::conditional_t<std::is_signed_v<W> && sizeof(W) < sizeof(std::intptr_t), std::intptr_t,// sign-extend signed types for masking operations
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
 	using M = std::conditional_t<std::is_integral_v<U>, U, std::intptr_t>;// used for masking operations
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
@@ -55094,20 +55052,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
-	static std::size_t constexpr limit4way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
+	static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 #if !defined(RSBD8_THREAD_MAXIMUM) || 6 <= (RSBD8_THREAD_MAXIMUM)// pre-computed index size (X)
 	auto pcall{radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, true>};
 	std::size_t indexsizeofpcall{sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>)};
@@ -55154,7 +55100,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				auto pcallsmaller{pcall};
-				static std::size_t constexpr filterlimit{std::max(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)), (limit4way + 1u) >> 1)};
+				static std::size_t constexpr filterlimit{(limit4way + 1u) >> 1};
 				if constexpr(ULLONG_MAX >= filterlimit && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= halfcounttop){
 					pcallsmaller = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned long long>);
@@ -55268,20 +55214,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
-	static std::size_t constexpr limit4way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
+	static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 #if !defined(RSBD8_THREAD_MAXIMUM) || 6 <= (RSBD8_THREAD_MAXIMUM)// pre-computed index size (X)
 	auto pcall{radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, true>};
 	std::size_t indexsizeofpcall{sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>)};
@@ -55328,7 +55262,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				auto pcallsmaller{pcall};
-				static std::size_t constexpr filterlimit{std::max(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)), (limit4way + 1u) >> 1)};
+				static std::size_t constexpr filterlimit{(limit4way + 1u) >> 1};
 				if constexpr(ULLONG_MAX >= filterlimit && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= halfcounttop){
 					pcallsmaller = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned long long>);
@@ -55437,7 +55371,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using U = std::conditional_t<std::is_signed_v<W> && sizeof(W) < sizeof(std::intptr_t), std::intptr_t,// sign-extend signed types for masking operations
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
 	using M = std::conditional_t<std::is_integral_v<U>, U, std::intptr_t>;// used for masking operations
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
@@ -56083,7 +56016,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using U = std::conditional_t<std::is_signed_v<W> && sizeof(W) < sizeof(std::intptr_t), std::intptr_t,// sign-extend signed types for masking operations
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
 	using M = std::conditional_t<std::is_integral_v<U>, U, std::intptr_t>;// used for masking operations
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
@@ -56517,20 +56449,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
-	static std::size_t constexpr limit4way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
+	static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 #if !defined(RSBD8_THREAD_MAXIMUM) || 8 <= (RSBD8_THREAD_MAXIMUM)// pre-computed index size (X)
 	auto pcall{radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, true>};
 	std::size_t indexsizeofpcall{sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>)};
@@ -56579,7 +56499,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				auto pcallsmaller{pcall};
-				static std::size_t constexpr filterlimit{std::max(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)), (limit4way + 2u) / 3u)};
+				static std::size_t constexpr filterlimit{(limit4way + 2u) / 3u};
 				if constexpr(ULLONG_MAX >= filterlimit && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= thirdcounttop){
 					pcallsmaller = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned long long>);
@@ -56703,21 +56623,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
-
-	static std::size_t constexpr limit4way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
+	static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 #if !defined(RSBD8_THREAD_MAXIMUM) || 8 <= (RSBD8_THREAD_MAXIMUM)// pre-computed index size (X)
 	auto pcall{radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>};
 	std::size_t indexsizeofpcall{sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>)};
@@ -56766,7 +56673,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				auto pcallsmaller{pcall};
-				static std::size_t constexpr filterlimit{std::max(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)), (limit4way + 2u) / 3u)};
+				static std::size_t constexpr filterlimit{(limit4way + 2u) / 3u};
 				if constexpr(ULLONG_MAX >= filterlimit && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= thirdcounttop){
 					pcallsmaller = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned long long>);
@@ -56887,27 +56794,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
-	static std::size_t constexpr limit4way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
-	static std::size_t constexpr limit8way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
-		base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		9u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
+	static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
+	static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	auto pcall{radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>};
 	if(limit2way <= count && 1u < allowedthreads)RSBD8_LIKELY{// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -56967,7 +56856,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			{
 				autowrapfutureonfuture<true> asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
 				if(limit8way <= count){// 8-way limit
-					static std::size_t constexpr filterlimit{std::max(3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)), (limit8way + 2u) / 3u)};
+					static std::size_t constexpr filterlimit{(limit8way + 2u) / 3u};
 					if(17u < allowedthreads){// 18-way
 						std::size_t const thirdcount{count / 3u};// rounded down
 						std::size_t const thirdcountmid{(count + 1u) / 3u};
@@ -57176,27 +57065,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
-	static std::size_t constexpr limit4way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
-	static std::size_t constexpr limit8way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
-		base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()
-#else
-		9u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
+	static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
+	static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	auto pcall{radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>};
 	if(limit2way <= count && 1u < allowedthreads)RSBD8_LIKELY{// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -57256,7 +57127,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			{
 				autowrapfutureonfuture<true> asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
 				if(limit8way <= count){// 8-way limit
-					static std::size_t constexpr filterlimit{std::max(3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)), (limit8way + 2u) / 3u)};
+					static std::size_t constexpr filterlimit{(limit8way + 2u) / 3u};
 					if(17u < allowedthreads){// 18-way
 						std::size_t const thirdcount{count / 3u};// rounded down
 						std::size_t const thirdcountmid{(count + 1u) / 3u};
@@ -57472,7 +57343,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
@@ -57723,7 +57593,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
@@ -57903,20 +57772,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
-	static std::size_t constexpr limit4way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
+	static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 #if !defined(RSBD8_THREAD_MAXIMUM) || 6 <= (RSBD8_THREAD_MAXIMUM)// pre-computed index size (X)
 	auto pcall{radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, true, vararguments...>};
 	std::size_t indexsizeofpcall{sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>)};
@@ -57963,7 +57820,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				auto pcallsmaller{pcall};
-				static std::size_t constexpr filterlimit{std::max(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)), (limit4way + 1u) >> 1)};
+				static std::size_t constexpr filterlimit{(limit4way + 1u) >> 1};
 				if constexpr(ULLONG_MAX >= filterlimit && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= halfcounttop){
 					pcallsmaller = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned long long>);
@@ -58076,20 +57933,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
-	static std::size_t constexpr limit4way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
+	static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 #if !defined(RSBD8_THREAD_MAXIMUM) || 6 <= (RSBD8_THREAD_MAXIMUM)// pre-computed index size (X)
 	auto pcall{radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, true, vararguments...>};
 	std::size_t indexsizeofpcall{sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>)};
@@ -58136,7 +57981,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				auto pcallsmaller{pcall};
-				static std::size_t constexpr filterlimit{std::max(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)), (limit4way + 1u) >> 1)};
+				static std::size_t constexpr filterlimit{(limit4way + 1u) >> 1};
 				if constexpr(ULLONG_MAX >= filterlimit && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= halfcounttop){
 					pcallsmaller = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned long long>);
@@ -58242,7 +58087,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
@@ -58704,7 +58548,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
-	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
@@ -59051,20 +58894,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
-	static std::size_t constexpr limit4way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
+	static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 #if !defined(RSBD8_THREAD_MAXIMUM) || 8 <= (RSBD8_THREAD_MAXIMUM)// pre-computed index size (X)
 	auto pcall{radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, true, vararguments...>};
 	std::size_t indexsizeofpcall{sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>)};
@@ -59113,7 +58944,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				auto pcallsmaller{pcall};
-				static std::size_t constexpr filterlimit{std::max(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)), (limit4way + 2u) / 3u)};
+				static std::size_t constexpr filterlimit{(limit4way + 2u) / 3u};
 				if constexpr(ULLONG_MAX >= filterlimit && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= thirdcounttop){
 					pcallsmaller = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned long long>);
@@ -59236,20 +59067,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
-	static std::size_t constexpr limit4way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
+	static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 #if !defined(RSBD8_THREAD_MAXIMUM) || 8 <= (RSBD8_THREAD_MAXIMUM)// pre-computed index size (X)
 	auto pcall{radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, true, vararguments...>};
 	std::size_t indexsizeofpcall{sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>)};
@@ -59298,7 +59117,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				auto pcallsmaller{pcall};
-				static std::size_t constexpr filterlimit{std::max(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)), (limit4way + 2u) / 3u)};
+				static std::size_t constexpr filterlimit{(limit4way + 2u) / 3u};
 				if constexpr(ULLONG_MAX >= filterlimit && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= thirdcounttop){
 					pcallsmaller = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
 					indexsizeofpcall = sizeof(offsetstype<isabsvalue, issignmode, isfltpmode, true, T, unsigned long long>);
@@ -59418,27 +59237,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
-	static std::size_t constexpr limit4way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
-	static std::size_t constexpr limit8way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
-		base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		9u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
+	static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
+	static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	auto pcall{radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>};
 	if(limit2way <= count && 1u < allowedthreads)RSBD8_LIKELY{// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -59498,7 +59299,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			{
 				autowrapfutureonfuture<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>> asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
 				if(limit8way <= count){// 8-way limit
-					static std::size_t constexpr filterlimit{std::max(3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)), (limit8way + 2u) / 3u)};
+					static std::size_t constexpr filterlimit{(limit8way + 2u) / 3u};
 					if(17u < allowedthreads){// 18-way
 						std::size_t const thirdcount{count / 3u};// rounded down
 						std::size_t const thirdcountmid{(count + 1u) / 3u};
@@ -59706,27 +59507,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 2 > (RSBD8_THREAD_MINIMUM)
-		base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
-	static std::size_t constexpr limit4way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
-	static std::size_t constexpr limit8way{
-#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
-		base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()
-#else
-		9u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *))
-#endif
-	};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
+	static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
+	static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	auto pcall{radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>};
 	if(limit2way <= count && 1u < allowedthreads)RSBD8_LIKELY{// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -59786,7 +59569,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			{
 				autowrapfutureonfuture<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>> asynchandlemid, asynchandletop;// this is to avoid having the child std::async tasks wait on the grandchild std::async tasks and instead do both here
 				if(limit8way <= count){// 8-way limit
-					static std::size_t constexpr filterlimit{std::max(3u * std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)), (limit8way + 2u) / 3u)};
+					static std::size_t constexpr filterlimit{(limit8way + 2u) / 3u};
 					if(17u < allowedthreads){// 18-way
 						std::size_t const thirdcount{count / 3u};// rounded down
 						std::size_t const thirdcountmid{(count + 1u) / 3u};
