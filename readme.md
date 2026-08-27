@@ -426,79 +426,129 @@ Sort as unsigned, just with the least significant bit flipped to complete the fi
 ```
 
 ## Performance tests
-### This library has a performance test suite.
+### This library has a performance test suite, and these tests were done with the CPU set to a steady 3.5 GHz on all cores, no throttling, no boosting for a fair 1:1 clock-per-clock comparison.
 These performance test results are for multithreaded sorting on an input array of 8 GiB with random bits (with no indirection, and NaN/infinity values filtered out before the tests).
-#### std::stable_sort() or std::sort() (only if stable, fastest one of the two is selected) vs rsbd8::radixsort(), measured in 10 ns units:
+#### std::stable_sort() for floating-point and std::sort() for integers (as the function performs a faster stable sort in these cases) vs rsbd8::radixsort(), measured in 10 ns units:
 ```
-- float : 225648945942 vs 20505108392, a factor of 11.00 in speedup
-- double: 118711890984 vs 24363563691, a factor of 4.873 in speedup
-- uint8 : 330491156231 vs_ 2336305967, a factor of 141.5 in speedup (comparison-based sort vs in essence a bucket sort)
-- int8 _: 309209752026 vs_ 2173729196, a factor of 142.2 in speedup (comparison-based sort vs in essence a bucket sort)
-- uint16: 184678356834 vs 20898291256, a factor of 8.837 in speedup
-- int16 : 178281321870 vs 21111612164, a factor of 8.445 in speedup
-- uint32: 121921678229 vs 19909066652, a factor of 6.124 in speedup
-- int32 : 131468939268 vs 19923708887, a factor of 6.599 in speedup
-- uint64:_ 59888977702 vs 23435736305, a factor of 2.555 in speedup
-- int64 :_ 62485073087 vs 23670827780, a factor of 2.640 in speedup
+- float : 222988022710 vs 20651487317, a factor of 10.80 in speedup
+- double: 119978839926 vs 24076554843, a factor of 4.983 in speedup
+- uint8 : 331191844635 vs_ 2205425221, a factor of 150.2 in speedup (comparison-based sort vs in essence a bucket sort)
+- int8 _: 320164203051 vs_ 2177899202, a factor of 147.0 in speedup (comparison-based sort vs in essence a bucket sort)
+- uint16: 184199968006 vs 14765943780, a factor of 12.47 in speedup
+- int16 : 178957686478 vs 13933607336, a factor of 12.84 in speedup
+- uint32: 119668335381 vs 19256567554, a factor of 6.214 in speedup
+- int32 : 123236987453 vs 19762451250, a factor of 6.236 in speedup
+- uint64:_ 57783520758 vs 23909100957, a factor of 2.417 in speedup
+- int64 :_ 62324902036 vs 22796669527, a factor of 2.734 in speedup
 ```
-Sorting with indirection on these radix sort functions slower, for the 64-bit types (same counts, same size, averaged) it's 3.10 times slower than sorting without indirection.
+Sorting with indirection on these radix sort functions, for the 64-bit types (same counts, same size, averaged) is 3.076 times slower than sorting without indirection.
 #### First-level indirection std::stable_sort() vs rsbd8::radixsort(), measured in 10 ns units:
 ```
-- float : 203625109844 vs 41537258020, a factor of 4.902 in speedup
-- double: 233093745336 vs 74532622762, a factor of 3.127 in speedup
-- uint8 : 120699225045 vs_ 6917171958, a factor of 17.45 in speedup (comparison-based sort vs in essence a bucket sort)
-- uint16: 158627798828 vs 23260307012, a factor of 6.820 in speedup
-- uint32: 201799731203 vs 41235819860, a factor of 4.894 in speedup
-- uint64: 231065973478 vs 73656630630, a factor of 3.137 in speedup
+- float : 202471075829 vs 41583734978, a factor of 4.869 in speedup
+- double: 231627536796 vs 74058455130, a factor of 3.128 in speedup
+- uint8 : 120691616750 vs_ 6901998908, a factor of 17.49 in speedup (comparison-based sort vs in essence a bucket sort)
+- uint16: 156500844720 vs 23766698391, a factor of 6.585 in speedup
+- uint32: 198336155800 vs 40858558450, a factor of 4.854 in speedup
+- uint64: 227346382912 vs 73565119718, a factor of 3.090 in speedup
 ```
 
 These performance test results are for multithreaded sorting on an input array of 8 MiB with random bits (with no indirection, and NaN/infinity values filtered out before the tests).
-#### std::stable_sort() or std::sort() (only if stable, fastest one of the two is selected) vs rsbd8::radixsort(), measured in 10 ns units:
+#### std::stable_sort() for floating-point and std::sort() for integers (as the function performs a faster stable sort in these cases) vs rsbd8::radixsort(), measured in 10 ns units:
 ```
-- float : 159946088 vs 35765138, a factor of 4.472 in speedup
-- double:_ 78941786 vs 33225174, a factor of 2.376 in speedup
-- uint8 : 308355870 vs_ 3694690, a factor of 83.46 in speedup (comparison-based sort vs in essence a bucket sort)
-- int8 _: 302360090 vs_ 4006192, a factor of 75.47 in speedup (comparison-based sort vs in essence a bucket sort)
-- uint16: 187233318 vs 21330282, a factor of 8.778 in speedup
-- int16 : 179471472 vs 20089464, a factor of 8.934 in speedup
-- uint32: 106195150 vs 35545480, a factor of 2.988 in speedup
-- int32 :_ 99453628 vs 34007781, a factor of 2.924 in speedup
-- uint64:_ 52682674 vs 31049466, a factor of 1.697 in speedup
-- int64 :_ 51974358 vs 31921702, a factor of 1.628 in speedup
+- float : 160558080 vs 35855927, a factor of 4.478 in speedup
+- double:_ 77908610 vs 36794499, a factor of 2.117 in speedup
+- uint8 : 312606500 vs_ 3904509, a factor of 80.06 in speedup (comparison-based sort vs in essence a bucket sort)
+- int8 _: 304056536 vs_ 3648098, a factor of 83.35 in speedup (comparison-based sort vs in essence a bucket sort)
+- uint16: 186612304 vs 24020259, a factor of 7.769 in speedup
+- int16 : 177857284 vs 20839855, a factor of 8.534 in speedup
+- uint32: 105141053 vs 40109296, a factor of 2.621 in speedup
+- int32 : 101571298 vs 34822936, a factor of 2.917 in speedup
+- uint64:_ 51337829 vs 26669600, a factor of 1.925 in speedup
+- int64 :_ 49785499 vs 34822266, a factor of 1.430 in speedup
 ```
-Sorting with indirection on these radix sort functions slower, for the 64-bit types (same counts, same size, averaged) it's 1.34 times slower than sorting without indirection.
+Sorting with indirection on these radix sort functions, for the 64-bit types (same counts, same size, averaged) is 1.374 times slower than sorting without indirection.
 #### First-level indirection std::stable_sort() vs rsbd8::radixsort(), measured in 10 ns units:
 ```
-- float :_ 96835318 vs 27360199, a factor of 3.539 in speedup
-- double: 102082244 vs 42910505, a factor of 2.379 in speedup
-- uint8 :_ 55525470 vs_ 6530363, a factor of 8.503 in speedup (comparison-based sort vs in essence a bucket sort)
-- uint16:_ 76101598 vs 13407773, a factor of 5.676 in speedup
-- uint32:_ 92933424 vs 23291102, a factor of 3.990 in speedup
-- uint64:_ 99533172 vs 43082707, a factor of 2.310 in speedup
+- float :_ 95270892 vs 27683502, a factor of 3.441 in speedup
+- double: 102873128 vs 43189334, a factor of 2.382 in speedup
+- uint8 :_ 49337614 vs_ 6572477, a factor of 7.507 in speedup (comparison-based sort vs in essence a bucket sort)
+- uint16:_ 74731070 vs 13231753, a factor of 5.648 in speedup
+- uint32:_ 92453151 vs 26075116, a factor of 3.546 in speedup
+- uint64:_ 95064426 vs 44039973, a factor of 2.159 in speedup
+```
+
+### This library has a performance test suite, and these tests were done with the CPU set to its regular performance mode, so the effects of throttling, boosting and all kinds of potential variance are present in each comparison.
+This way of testing takes out the 1:1 clock-per-clock comparison, but does bring the tests closer to the real-world usage case.
+#### std::stable_sort() for floating-point and std::sort() for integers (as the function performs a faster stable sort in these cases) vs rsbd8::radixsort(), measured in 10 ns units:
+```
+- float : 170753842640 vs 16546584080, a factor of 10.32 in speedup
+- double:_ 87570922046 vs 21106226384, a factor of 4.149 in speedup
+- uint8 : 229274088931 vs_ 1703359326, a factor of 134.6 in speedup (comparison-based sort vs in essence a bucket sort)
+- int8 _: 229115806108 vs_ 1665073620, a factor of 137.6 in speedup (comparison-based sort vs in essence a bucket sort)
+- uint16: 140354781152 vs 11361919492, a factor of 12.35 in speedup
+- int16 : 126370557266 vs 11360401626, a factor of 11.12 in speedup
+- uint32:_ 80523980797 vs 15323123626, a factor of 5.255 in speedup
+- int32 :_ 80004706164 vs 16886012874, a factor of 4.738 in speedup
+- uint64:_ 42659822611 vs 21355332813, a factor of 1.998 in speedup
+- int64 :_ 42921349117 vs 20743735519, a factor of 2.069 in speedup
+```
+Sorting with indirection on these radix sort functions, for the 64-bit types (same counts, same size, averaged) is 3.456 times slower than sorting without indirection.
+#### First-level indirection std::stable_sort() vs rsbd8::radixsort(), measured in 10 ns units:
+```
+- float : 183079629954 vs 40739923084, a factor of 4.494 in speedup
+- double: 214263258181 vs 73820395030, a factor of 2.902 in speedup
+- uint8 : 106478668842 vs_ 5609448537, a factor of 18.98 in speedup (comparison-based sort vs in essence a bucket sort)
+- uint16: 139490364100 vs 20558607294, a factor of 6.785 in speedup
+- uint32: 181590769406 vs 40427557552, a factor of 4.492 in speedup
+- uint64: 211530441704 vs 72918226793, a factor of 2.901 in speedup
+```
+
+These performance test results are for multithreaded sorting on an input array of 8 MiB with random bits (with no indirection, and NaN/infinity values filtered out before the tests).
+#### std::stable_sort() for floating-point and std::sort() for integers (as the function performs a faster stable sort in these cases) vs rsbd8::radixsort(), measured in 10 ns units:
+```
+- float : 106913763 vs 25861890, a factor of 4.134 in speedup
+- double:_ 54096962 vs 19678736, a factor of 2.749 in speedup
+- uint8 : 215003526 vs_ 3471186, a factor of 61.94 in speedup (comparison-based sort vs in essence a bucket sort)
+- int8 _: 211433096 vs_ 2985172, a factor of 70.83 in speedup (comparison-based sort vs in essence a bucket sort)
+- uint16: 128435392 vs 14855975, a factor of 8.645 in speedup
+- int16 : 124225020 vs 16348204, a factor of 7.599 in speedup
+- uint32:_ 74048523 vs 26781122, a factor of 2.765 in speedup
+- int32 :_ 69288318 vs 26345511, a factor of 2.630 in speedup
+- uint64:_ 35831585 vs 21972964, a factor of 1.631 in speedup
+- int64 :_ 34120735 vs 21524322, a factor of 1.585 in speedup
+```
+Sorting with indirection on these radix sort functions, for the 64-bit types (same counts, same size, averaged) is 1.524 times slower than sorting without indirection.
+#### First-level indirection std::stable_sort() vs rsbd8::radixsort(), measured in 10 ns units:
+```
+- float : 65347030 vs 20796397, a factor of 3.142 in speedup
+- double: 70397421 vs 33465004, a factor of 2.104 in speedup
+- uint8 : 35950738 vs_ 5536212, a factor of 6.494 in speedup (comparison-based sort vs in essence a bucket sort)
+- uint16: 50941047 vs 10208071, a factor of 4.990 in speedup
+- uint32: 63085420 vs 20948052, a factor of 3.012 in speedup
+- uint64: 66224310 vs 30032136, a factor of 2.205 in speedup
 ```
 
 ### The next tests were done on smaller blocks.
 There will be a minimum amount of array entries where rsbd8::radixsort() starts to get the upper hand in speed over std::stable_sort().
 #### These test results were obtained by single-threaded performance testing on multiple sizes of blocks between .5 to 512 KiB, with fully random bits in unsigned integer and floating-point arrays (with no indirection):
-```
 - float : 354 array entries
 - double: 426 array entries
-- uint8 : 19 array entries
+- uint8 :_ 19 array entries
 - uint16: 349 array entries
 - uint32: 523 array entries
 - uint64: 557 array entries
-```
 Interpreting this means that radix sort variants will be faster for somewhat larger arrays when sorting data under the given conditions.
 In this case that's a sequence of just plain values in an array.
 When dealing with sorting while using indirection or more filtering, test results will vary.
 
-### System configuration data ofthe last performance tests:
-#### The main performance tests were done on 2026-07-07 on development PC 1:
+### System configuration data of the last performance tests:
+#### The main performance tests were done on 2026-08-27 on development PC 1:
 - Intel Core i9 11900K, specification string: 11th Gen Intel Core i9-11900K @ 3.50GHz
 - Corsair CMK16GX4M2B3200C16 * 2, 32 GiB, 1600 MHz (XMP-3200 scheme), DDR4
 - ASRock Z590 PG Velocita, UEFI version 2.01 beta
-- Windows 11 Home Single Language, (25H2) build 26200.8524
-- Microsoft Visual Studio 2026 (Community edition) Insiders build 11925.187, using the preview build tools and Visual C++ 2026 compiler
-- The CPU was locked to run at 3.5 GHz on all cores in the UEFI, without boosts or throttling during testing.
+- Windows 11 Home Single Language, (25H2) build 10.0.26100.9168
+- Microsoft Visual Studio 2026 (Community edition) Insiders build 12120.281, using the preview build tools and Visual C++ 2026 compiler
+- In the first set of benchmarks the CPU was locked to run at 3.5 GHz on all cores in the UEFI, without boosts or throttling during testing.
+- In the second set of benchmarks the CPU was allowed all throttling and boosting options in the UEFI, which is the regular, everyday performance mode.
 - Some background programs were disabled, and the main testing was done by just running the test executable and letting DebugView x64 do the readout
 - DebugView is also useful at keeping a record on any outputs generated by other simultaneous processes to analyse some possible disturbances. If any such disturbances were detected, the test run was discarded and re-done.
