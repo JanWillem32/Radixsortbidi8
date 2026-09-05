@@ -55495,6 +55495,8 @@ handle0filtered:// architecture: jump label reuse (from the else branch, includi
 					cur1 = *pdata1;
 					comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 				}else{
+					cur1 = cur0;
+					comp1 = comp0;
 					pdata1 = pdata0;
 					pdata1stop = pdata0stop;
 					goto lastloopfiltered;
@@ -55511,6 +55513,10 @@ handle0filtered:// architecture: jump label reuse (from the else branch, includi
 					cur2 = *pdata2;
 					comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 				}else{
+					cur2 = cur1;
+					cur1 = cur0;
+					comp2 = comp1;
+					comp1 = comp0;
 					pdata2 = pdata1;
 					pdata1 = pdata0;
 					pdata2stop = pdata1stop;
@@ -55813,6 +55819,7 @@ handle0unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				if(pdata1stop < pdata1){
 					cur1 = *pdata1;
 				}else{
+					cur1 = cur0;
 					pdata1 = pdata0;
 					pdata1stop = pdata0stop;
 					goto lastloopunfiltered;
@@ -55828,6 +55835,8 @@ handle0unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				if(pdata2stop < pdata2){
 					cur2 = *pdata2;
 				}else{
+					cur2 = cur1;
+					cur1 = cur0;
 					pdata2 = pdata1;
 					pdata1 = pdata0;
 					pdata2stop = pdata1stop;
@@ -56140,6 +56149,8 @@ handle2filtered:// architecture: jump label reuse (from the else branch, includi
 					cur1 = *pdata1;
 					comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 				}else{
+					cur1 = cur2;
+					comp1 = comp2;
 					pdata1 = pdata2;
 					goto lastloopfiltered;
 				}
@@ -56155,6 +56166,10 @@ handle2filtered:// architecture: jump label reuse (from the else branch, includi
 					cur0 = *pdata0;
 					comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 				}else{
+					cur0 = cur1;
+					cur1 = cur2;
+					comp0 = comp1;
+					comp1 = comp2;
 					pdata0 = pdata1;
 					pdata1 = pdata2;
 					goto lastloopfiltered;
@@ -56334,6 +56349,7 @@ handle2unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				if(pdata1stop > pdata1){
 					cur1 = *pdata1;
 				}else{
+					cur1 = cur2;
 					pdata1 = pdata2;
 					goto lastloopunfiltered;
 				}
@@ -56348,6 +56364,8 @@ handle2unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				if(pdata0stop > pdata0){
 					cur0 = *pdata0;
 				}else{
+					cur0 = cur1;
+					cur1 = cur2;
 					pdata0 = pdata1;
 					pdata1 = pdata2;
 					goto lastloopunfiltered;
@@ -58256,6 +58274,7 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 					prefetchcurrent<indirection1>(pn);
 				}
 			}else{
+				comp1 = comp0;
 				pdata1 = pdata0;
 				pdata1stop = pdata0stop;
 				goto lastloop;
@@ -58282,6 +58301,8 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 					prefetchcurrent<indirection1>(pn);
 				}
 			}else{
+				comp2 = comp1;
+				comp1 = comp0;
 				pdata2 = pdata1;
 				pdata1 = pdata0;
 				pdata2stop = pdata1stop;
@@ -58717,6 +58738,7 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 					prefetchcurrent<indirection1>(pn);
 				}
 			}else{
+				comp1 = comp2;
 				pdata1 = pdata2;
 				goto lastloop;
 			}
@@ -58742,6 +58764,8 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 					prefetchcurrent<indirection1>(pn);
 				}
 			}else{
+				comp0 = comp1;
+				comp1 = comp2;
 				pdata0 = pdata1;
 				pdata1 = pdata2;
 				goto lastloop;
