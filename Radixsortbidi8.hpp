@@ -16609,7 +16609,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			// architecture: limit to two at a time when there's few registers
 			std::size_t j{(count + 1u) >> (1u + usemultithread)};// rounded down in the bottom part
 			if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-				std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (1u + usemultithread)};
+				std::size_t end{prefetchmaxstride / sizeof(V *) >> (1u + usemultithread)};
 				std::size_t i{j - end};
 				j = end;
 				do RSBD8_LIKELY{// fill the array, two at a time
@@ -16740,7 +16740,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			// architecture: limit to two at a time when there's few registers
 			std::size_t j{(count + 1u) >> (1u + usemultithread)};// rounded down in the bottom part
 			if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-				std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (1u + usemultithread)};
+				std::size_t end{prefetchmaxstride / sizeof(V *) >> (1u + usemultithread)};
 				std::size_t i{j - end};
 				j = end;
 				do RSBD8_LIKELY{// fill the array, two at a time
@@ -16783,7 +16783,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			// architecture: limit to four at a time when there's a decent amount of registers
 			std::size_t j{(count + 1u) >> (2u + usemultithread)};// rounded down in the bottom part
 			if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-				std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (2u + usemultithread)};
+				std::size_t end{prefetchmaxstride / sizeof(V *) >> (2u + usemultithread)};
 				std::size_t i{j - end};
 				j = end;
 				do RSBD8_LIKELY{// fill the array, four at a time
@@ -16975,7 +16975,7 @@ handlebelowtop:
 					// architecture: limit to two at a time when there's few registers
 					std::size_t j{(count + 1u) >> (1u + usemultithread)};// rounded down in the bottom part
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-						std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (1u + usemultithread)};
+						std::size_t end{prefetchmaxstride / sizeof(V *) >> (1u + usemultithread)};
 						std::size_t i{j - end};
 						j = end;
 						do RSBD8_LIKELY{// fill the array, two at a time
@@ -17018,7 +17018,7 @@ handlebelowtop:
 					// architecture: limit to four at a time when there's a decent amount of registers
 					std::size_t j{(count + 1u) >> (2u + usemultithread)};// rounded down in the bottom part
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-						std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (2u + usemultithread)};
+						std::size_t end{prefetchmaxstride / sizeof(V *) >> (2u + usemultithread)};
 						std::size_t i{j - end};
 						j = end;
 						do RSBD8_LIKELY{// fill the array, four at a time
@@ -17212,7 +17212,7 @@ handletop:
 				// architecture: limit to two at a time when there's few registers
 				std::size_t j{(count + 1u) >> (1u + usemultithread)};// rounded down in the bottom part
 				if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-					std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (1u + usemultithread)};
+					std::size_t end{prefetchmaxstride / sizeof(V *) >> (1u + usemultithread)};
 					std::size_t i{j - end};
 					j = end;
 					do RSBD8_LIKELY{// fill the array, two at a time
@@ -17255,7 +17255,7 @@ handletop:
 				// architecture: limit to four at a time when there's a decent amount of registers
 				std::size_t j{(count + 1u) >> (2u + usemultithread)};// rounded down in the bottom part
 				if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-					std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (2u + usemultithread)};
+					std::size_t end{prefetchmaxstride / sizeof(V *) >> (2u + usemultithread)};
 					std::size_t i{j - end};
 					j = end;
 					do RSBD8_LIKELY{// fill the array, four at a time
@@ -21533,7 +21533,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			// architecture: limit to four at a time when there's a decent amount of registers
 			std::size_t j{(count + 1u) >> (2u + usemultithread)};// rounded down in the bottom part
 			if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-				std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (2u + usemultithread)};
+				std::size_t end{prefetchmaxstride / sizeof(V *) >> (2u + usemultithread)};
 				std::size_t i{j - end};
 				j = end;
 				do RSBD8_LIKELY{// fill the array, four at a time
@@ -21700,7 +21700,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			// architecture: limit to four at a time when there's a decent amount of registers
 			std::size_t j{(count + 1u) >> (2u + usemultithread)};// rounded down in the bottom part
 			if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-				std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (2u + usemultithread)};
+				std::size_t end{prefetchmaxstride / sizeof(V *) >> (2u + usemultithread)};
 				std::size_t i{j - end};
 				j = end;
 				do RSBD8_LIKELY{// fill the array, four at a time
@@ -21866,7 +21866,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 				// architecture: limit to four at a time when there's a decent amount of registers
 				std::size_t j{(count + 1u) >> (2u + usemultithread)};// rounded down in the bottom part
 				if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-					std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (2u + usemultithread)};
+					std::size_t end{prefetchmaxstride / sizeof(V *) >> (2u + usemultithread)};
 					std::size_t i{j - end};
 					j = end;
 					do RSBD8_LIKELY{// fill the array, four at a time
@@ -26603,7 +26603,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 				std::size_t j{(count + 1u) >> (1u + usemultithread)};// rounded down in the bottom part
 				if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-					std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (1u + usemultithread)};
+					std::size_t end{prefetchmaxstride / sizeof(V *) >> (1u + usemultithread)};
 					std::size_t i{j - end};
 					j = end;
 					do RSBD8_LIKELY{// fill the array, two at a time
@@ -26645,7 +26645,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}else{// architecture: limit to four at a time when there's a decent amount of registers
 				std::size_t j{(count + 1u) >> (2u + usemultithread)};// rounded down in the bottom part
 				if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-					std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (2u + usemultithread)};
+					std::size_t end{prefetchmaxstride / sizeof(V *) >> (2u + usemultithread)};
 					std::size_t i{j - end};
 					j = end;
 					do RSBD8_LIKELY{// fill the array, four at a time
@@ -26812,7 +26812,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 				std::size_t j{(count + 1u) >> (1u + usemultithread)};// rounded down in the bottom part
 				if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-					std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (1u + usemultithread)};
+					std::size_t end{prefetchmaxstride / sizeof(V *) >> (1u + usemultithread)};
 					std::size_t i{j - end};
 					j = end;
 					do RSBD8_LIKELY{// fill the array, two at a time
@@ -26854,7 +26854,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}else{// architecture: limit to four at a time when there's a decent amount of registers
 				std::size_t j{(count + 1u) >> (2u + usemultithread)};// rounded down in the bottom part
 				if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-					std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (2u + usemultithread)};
+					std::size_t end{prefetchmaxstride / sizeof(V *) >> (2u + usemultithread)};
 					std::size_t i{j - end};
 					j = end;
 					do RSBD8_LIKELY{// fill the array, four at a time
@@ -27020,7 +27020,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 					std::size_t j{(count + 1u) >> (1u + usemultithread)};// rounded down in the bottom part
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-						std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (1u + usemultithread)};
+						std::size_t end{prefetchmaxstride / sizeof(V *) >> (1u + usemultithread)};
 						std::size_t i{j - end};
 						j = end;
 						do RSBD8_LIKELY{// fill the array, two at a time
@@ -27062,7 +27062,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 				}else{// architecture: limit to four at a time when there's a decent amount of registers
 					std::size_t j{(count + 1u) >> (2u + usemultithread)};// rounded down in the bottom part
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-						std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (2u + usemultithread)};
+						std::size_t end{prefetchmaxstride / sizeof(V *) >> (2u + usemultithread)};
 						std::size_t i{j - end};
 						j = end;
 						do RSBD8_LIKELY{// fill the array, four at a time
@@ -33302,7 +33302,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) i = initmtslicemain<3>(count, allowedthreads, assignedslice);
 						T const *RSBD8_RESTRICT pinput{input + (count - i)};
 						i -= 2;
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							U cura{pinput[0]};
 							U curb{pinput[1]};
 							U curc{pinput[2]};
@@ -33355,7 +33355,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 11) + static_cast<std::size_t>(cur1c)];
 							++offsets[(2u << 11) + static_cast<std::size_t>(curc)];
 							i -= 3;
-						}
+						}while(0 <= i);
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
 							U cura{pinput[0]};
@@ -33459,7 +33459,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<3>(count, allowedthreads, assignedslice);
 						i -= 2;
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							U cura{input[i + 2]};
 							U curb{input[i + 1]};
 							U curc{input[i]};
@@ -33502,7 +33502,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 11) + static_cast<std::size_t>(cur1c)];
 							++offsets[(2u << 11) + static_cast<std::size_t>(curc)];
 							i -= 3;
-						}
+						}while(0 <= i);
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
 							U cura{input[1]};
@@ -33580,7 +33580,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) i = initmtslicemain<3>(count, allowedthreads, assignedslice);
 						T const *RSBD8_RESTRICT pinput{input + (count - i)};
 						i -= 2;
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							U cura{pinput[0]};
 							U curb{pinput[1]};
 							U curc{pinput[2]};
@@ -33633,7 +33633,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(cur1c)];
 							++offsets[(2u << 8) + static_cast<std::size_t>(curc)];
 							i -= 3;
-						}
+						}while(0 <= i);
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
 							U cura{pinput[0]};
@@ -33712,7 +33712,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<3>(count, allowedthreads, assignedslice);
 						i -= 2;
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							U cura{input[i + 2]};
 							U curb{input[i + 1]};
 							U curc{input[i]};
@@ -33755,7 +33755,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(cur1c)];
 							++offsets[(2u << 8) + static_cast<std::size_t>(curc)];
 							i -= 3;
-						}
+						}while(0 <= i);
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
 							U cura{input[1]};
@@ -33830,7 +33830,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) i = initmtslicemain<4>(count, allowedthreads, assignedslice);
 						T const *RSBD8_RESTRICT pinput{input + (count - i)};
 						i -= 3;
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							U cura{pinput[0]};
 							U curb{pinput[1]};
 							U curc{pinput[2]};
@@ -33885,7 +33885,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(curc)];
 							++offsets[(1u << 8) + static_cast<std::size_t>(curd)];
 							i -= 4;
-						}
+						}while(0 <= i);
 						if(2 & i){// fill in the final two items for a remainder of 2 or 3
 							U cura{pinput[0]};
 							U curb{pinput[1]};
@@ -33953,7 +33953,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<4>(count, allowedthreads, assignedslice);
 						i -= 3;
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							U cura{input[i + 3]};
 							U curb{input[i + 2]};
 							U curc{input[i + 1]};
@@ -33995,7 +33995,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(curc)];
 							++offsets[(1u << 8) + static_cast<std::size_t>(curd)];
 							i -= 4;
-						}
+						}while(0 <= i);
 						if(2 & i){// fill in the final two items for a remainder of 2 or 3
 							U cura{input[i + 3]};
 							U curb{input[i + 2]};
@@ -35961,7 +35961,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<3>(count, allowedthreads, assignedslice);
 						i -= 2;
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							U cura{input[i + 2]};
 							U curb{input[i + 1]};
 							U curc{input[i]};
@@ -36004,7 +36004,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 11) + static_cast<std::size_t>(cur1c)];
 							++offsets[(2u << 11) + static_cast<std::size_t>(curc)];
 							i -= 3;
-						}
+						}while(0 <= i);
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
 							U cura{input[1]};
@@ -36378,7 +36378,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<3>(count, allowedthreads, assignedslice);
 						i -= 2;
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							U cura{input[i + 2]};
 							U curb{input[i + 1]};
 							U curc{input[i]};
@@ -36421,7 +36421,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(cur1c)];
 							++offsets[(2u << 8) + static_cast<std::size_t>(curc)];
 							i -= 3;
-						}
+						}while(0 <= i);
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
 							U cura{input[1]};
@@ -36662,7 +36662,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<4>(count, allowedthreads, assignedslice);
 						i -= 3;
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							U cura{input[i + 3]};
 							U curb{input[i + 2]};
 							U curc{input[i + 1]};
@@ -36704,7 +36704,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(curc)];
 							++offsets[(1u << 8) + static_cast<std::size_t>(curd)];
 							i -= 4;
-						}
+						}while(0 <= i);
 						if(2 & i){// fill in the final two items for a remainder of 2 or 3
 							U cura{input[i + 3]};
 							U curb{input[i + 2]};
@@ -40006,7 +40006,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 				std::size_t j{(count + 1u) >> (1u + usemultithread)};// rounded down in the bottom part
 				if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-					std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (1u + usemultithread)};
+					std::size_t end{prefetchmaxstride / sizeof(V *) >> (1u + usemultithread)};
 					std::size_t i{j - end};
 					j = end;
 					do RSBD8_LIKELY{// fill the array, two at a time
@@ -40048,7 +40048,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}else{// architecture: limit to four at a time when there's a decent amount of registers
 				std::size_t j{(count + 1u) >> (2u + usemultithread)};// rounded down in the bottom part
 				if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-					std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (2u + usemultithread)};
+					std::size_t end{prefetchmaxstride / sizeof(V *) >> (2u + usemultithread)};
 					std::size_t i{j - end};
 					j = end;
 					do RSBD8_LIKELY{// fill the array, four at a time
@@ -40217,7 +40217,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 					std::size_t j{(count + 1u) >> (1u + usemultithread)};// rounded down in the bottom part
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-						std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (1u + usemultithread)};
+						std::size_t end{prefetchmaxstride / sizeof(V *) >> (1u + usemultithread)};
 						std::size_t i{j - end};
 						j = end;
 						do RSBD8_LIKELY{// fill the array, two at a time
@@ -40259,7 +40259,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 				}else{// architecture: limit to four at a time when there's a decent amount of registers
 					std::size_t j{(count + 1u) >> (2u + usemultithread)};// rounded down in the bottom part
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-						std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (2u + usemultithread)};
+						std::size_t end{prefetchmaxstride / sizeof(V *) >> (2u + usemultithread)};
 						std::size_t i{j - end};
 						j = end;
 						do RSBD8_LIKELY{// fill the array, four at a time
@@ -42739,7 +42739,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								i = j + static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)));// -3, -2 or -1, to add the remainder term after the two loops
 							}
 						}
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							V *RSBD8_RESTRICT pa{pinput[0]};
 							V *RSBD8_RESTRICT pb{pinput[1]};
 							V *RSBD8_RESTRICT pc{pinput[2]};
@@ -42784,7 +42784,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 11) + static_cast<std::size_t>(cur1c)];
 							++offsets[(2u << 11) + static_cast<std::size_t>(curc)];
 							i -= 3;
-						}
+						}while(0 <= i);
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
 							V *RSBD8_RESTRICT pa{pinput[0]};
@@ -43011,7 +43011,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								i = j + static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)));// -3, -2 or -1, to add the remainder term after the two loops
 							}
 						}
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							V *RSBD8_RESTRICT pa{input[i + 2]};
 							V *RSBD8_RESTRICT pb{input[i + 1]};
 							V *RSBD8_RESTRICT pc{input[i]};
@@ -43052,7 +43052,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 11) + static_cast<std::size_t>(cur1c)];
 							++offsets[(2u << 11) + static_cast<std::size_t>(curc)];
 							i -= 3;
-						}
+						}while(0 <= i);
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
 							V *RSBD8_RESTRICT pa{input[1]};
@@ -43231,7 +43231,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								i = j + static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)));// -3, -2 or -1, to add the remainder term after the two loops
 							}
 						}
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							V *RSBD8_RESTRICT pa{pinput[0]};
 							V *RSBD8_RESTRICT pb{pinput[1]};
 							V *RSBD8_RESTRICT pc{pinput[2]};
@@ -43276,7 +43276,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(cur1c)];
 							++offsets[(2u << 8) + static_cast<std::size_t>(curc)];
 							i -= 3;
-						}
+						}while(0 <= i);
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
 							V *RSBD8_RESTRICT pa{pinput[0]};
@@ -43445,7 +43445,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								i = j + static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)));// -3, -2 or -1, to add the remainder term after the two loops
 							}
 						}
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							V *RSBD8_RESTRICT pa{input[i + 2]};
 							V *RSBD8_RESTRICT pb{input[i + 1]};
 							V *RSBD8_RESTRICT pc{input[i]};
@@ -43486,7 +43486,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(cur1c)];
 							++offsets[(2u << 8) + static_cast<std::size_t>(curc)];
 							i -= 3;
-						}
+						}while(0 <= i);
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
 							V *RSBD8_RESTRICT pa{input[1]};
@@ -43661,7 +43661,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								i = j + static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)));// -4, -3, -2 or -1, to add the remainder term after the two loops
 							}
 						}
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							V *RSBD8_RESTRICT pa{pinput[0]};
 							V *RSBD8_RESTRICT pb{pinput[1]};
 							V *RSBD8_RESTRICT pc{pinput[2]};
@@ -43707,7 +43707,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(curc)];
 							++offsets[(1u << 8) + static_cast<std::size_t>(curd)];
 							i -= 4;
-						}
+						}while(0 <= i);
 						if(2 & i){
 							V *RSBD8_RESTRICT pa{pinput[0]};
 							V *RSBD8_RESTRICT pb{pinput[1]};
@@ -43864,7 +43864,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								i = j + static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)));// -4, -3, -2 or -1, to add the remainder term after the two loops
 							}
 						}
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							V *RSBD8_RESTRICT pa{input[i + 3]};
 							V *RSBD8_RESTRICT pb{input[i + 2]};
 							V *RSBD8_RESTRICT pc{input[i + 1]};
@@ -43905,7 +43905,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(curc)];
 							++offsets[(1u << 8) + static_cast<std::size_t>(curd)];
 							i -= 4;
-						}
+						}while(0 <= i);
 						if(2 & i){// fill in the final two items for a remainder of 2 or 3
 							V *RSBD8_RESTRICT pa{input[i + 3]};
 							V *RSBD8_RESTRICT pb{input[i + 2]};
@@ -47104,7 +47104,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								i = j + static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)));// -3, -2 or -1, to add the remainder term after the two loops
 							}
 						}
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							V *RSBD8_RESTRICT pa{input[i + 2]};
 							V *RSBD8_RESTRICT pb{input[i + 1]};
 							V *RSBD8_RESTRICT pc{input[i]};
@@ -47145,7 +47145,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 11) + static_cast<std::size_t>(cur1c)];
 							++offsets[(2u << 11) + static_cast<std::size_t>(curc)];
 							i -= 3;
-						}
+						}while(0 <= i);
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
 							V *RSBD8_RESTRICT pa{input[1]};
@@ -47732,7 +47732,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								i = j + static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)));// -3, -2 or -1, to add the remainder term after the two loops
 							}
 						}
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							V *RSBD8_RESTRICT pa{input[i + 2]};
 							V *RSBD8_RESTRICT pb{input[i + 1]};
 							V *RSBD8_RESTRICT pc{input[i]};
@@ -47773,7 +47773,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(cur1c)];
 							++offsets[(2u << 8) + static_cast<std::size_t>(curc)];
 							i -= 3;
-						}
+						}while(0 <= i);
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
 							V *RSBD8_RESTRICT pa{input[1]};
@@ -48184,7 +48184,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								i = j + static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)));// -4, -3, -2 or -1, to add the remainder term after the two loops
 							}
 						}
-						while(0 <= i)RSBD8_LIKELY{
+						if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 							V *RSBD8_RESTRICT pa{input[i + 3]};
 							V *RSBD8_RESTRICT pb{input[i + 2]};
 							V *RSBD8_RESTRICT pc{input[i + 1]};
@@ -48225,7 +48225,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(curc)];
 							++offsets[(1u << 8) + static_cast<std::size_t>(curd)];
 							i -= 4;
-						}
+						}while(0 <= i);
 						if(2 & i){// fill in the final two items for a remainder of 2 or 3
 							V *RSBD8_RESTRICT pa{input[i + 3]};
 							V *RSBD8_RESTRICT pb{input[i + 2]};
@@ -49213,7 +49213,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else{// architecture: do not limit as much when there's a reasonable amount of registers
 				if constexpr(ismultithreadcapable) i = initmtslicemain<8>(count, allowedthreads, assignedslice);
 				i -= 7;
-				while(0 <= i)RSBD8_LIKELY{
+				if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 					U cura{input[i + 7]};
 					U curb{input[i + 6]};
 					U curc{input[i + 5]};
@@ -49284,7 +49284,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					++offsets[curh];
 					i -= 8;
-				}
+				}while(0 <= i);
 				if(4 & i){// fill in the final four items for a remainder of 4 to 7
 					U cura{input[i + 7]};
 					U curb{input[i + 6]};
@@ -49493,7 +49493,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else{// architecture: do not limit as much when there's a reasonable amount of registers
 				if constexpr(ismultithreadcapable) i = initmtslicemain<8>(count, allowedthreads, assignedslice);
 				i -= 7;
-				while(0 <= i)RSBD8_LIKELY{
+				if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 					U cura{input[i + 7]};
 					U curb{input[i + 6]};
 					U curc{input[i + 5]};
@@ -49528,7 +49528,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[curg];
 					++offsets[curh];
 					i -= 8;
-				}
+				}while(0 <= i);
 				if(4 & i){// fill in the final four items for a remainder of 4 to 7
 					U cura{input[i + 7]};
 					U curb{input[i + 6]};
@@ -49788,7 +49788,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else{// architecture: do not limit as much when there's a reasonable amount of registers
 				if constexpr(ismultithreadcapable) i = initmtslicemain<8>(count, allowedthreads, assignedslice);
 				i -= 7;
-				while(0 <= i)RSBD8_LIKELY{
+				if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 					U cura{input[i + 7]};
 					U curb{input[i + 6]};
 					U curc{input[i + 5]};
@@ -49859,7 +49859,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					++offsets[curh];
 					i -= 8;
-				}
+				}while(0 <= i);
 				if(4 & i){// fill in the final four items for a remainder of 4 to 7
 					U cura{input[i + 7]};
 					U curb{input[i + 6]};
@@ -50060,7 +50060,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else{// architecture: do not limit as much when there's a reasonable amount of registers
 				if constexpr(ismultithreadcapable) i = initmtslicemain<8>(count, allowedthreads, assignedslice);
 				i -= 7;
-				while(0 <= i)RSBD8_LIKELY{
+				if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 					U cura{input[i + 7]};
 					U curb{input[i + 6]};
 					U curc{input[i + 5]};
@@ -50095,7 +50095,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[curg];
 					++offsets[curh];
 					i -= 8;
-				}
+				}while(0 <= i);
 				if(4 & i){// fill in the final four items for a remainder of 4 to 7
 					U cura{input[i + 7]};
 					U curb{input[i + 6]};
@@ -50408,7 +50408,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			std::size_t j{(count + 1u) >> (1u + usemultithread)};// rounded down in the bottom part
 			if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-				std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (1u + usemultithread)};
+				std::size_t end{prefetchmaxstride / sizeof(V *) >> (1u + usemultithread)};
 				std::size_t i{j - end};
 				j = end;
 				do RSBD8_LIKELY{// fill the array, two at a time
@@ -50462,7 +50462,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{// architecture: limit to four at a time when there's a decent amount of registers
 			std::size_t j{(count + 1u) >> (2u + usemultithread)};// rounded down in the bottom part
 			if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
-				std::size_t end{prefetchmaxstride / (2u * sizeof(V *)) >> (2u + usemultithread)};
+				std::size_t end{prefetchmaxstride / sizeof(V *) >> (2u + usemultithread)};
 				std::size_t i{j - end};
 				j = end;
 				do RSBD8_LIKELY{// fill the array, four at a time
@@ -50937,7 +50937,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						i = j + static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)));// -8, -7, -6, -5, -4, -3 -2 or -1, to add the remainder term after the two loops
 					}
 				}
-				while(0 <= i)RSBD8_LIKELY{
+				if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 					V *RSBD8_RESTRICT pa{input[i + 7]};
 					V *RSBD8_RESTRICT pb{input[i + 6]};
 					V *RSBD8_RESTRICT pc{input[i + 5]};
@@ -50995,7 +50995,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[curg];
 					++offsets[curh];
 					i -= 8;
-				}
+				}while(0 <= i);
 				if(4 & i){// fill in the final four items for a remainder of 4 to 7
 					V *RSBD8_RESTRICT pa{input[i + 7]};
 					V *RSBD8_RESTRICT pb{input[i + 6]};
@@ -51399,7 +51399,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						i = j + static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)));// -8, -7, -6, -5, -4, -3 -2 or -1, to add the remainder term after the two loops
 					}
 				}
-				while(0 <= i)RSBD8_LIKELY{
+				if(ismultithreadcapable || 0 <= i)RSBD8_LIKELY do RSBD8_LIKELY{
 					V *RSBD8_RESTRICT pa{input[i + 7]};
 					V *RSBD8_RESTRICT pb{input[i + 6]};
 					V *RSBD8_RESTRICT pc{input[i + 5]};
@@ -51457,7 +51457,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[curg];
 					++offsets[curh];
 					i -= 8;
-				}
+				}while(0 <= i);
 				if(4 & i){// fill in the final four items for a remainder of 4 to 7
 					V *RSBD8_RESTRICT pa{input[i + 7]};
 					V *RSBD8_RESTRICT pb{input[i + 6]};
@@ -55430,9 +55430,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	W const *RSBD8_RESTRICT pdata1{reinterpret_cast<W const *RSBD8_RESTRICT>(input) + (thirdcount + thirdcountmid)};
 	W const *RSBD8_RESTRICT pdata0{reinterpret_cast<W const *RSBD8_RESTRICT>(input) + (isrevorder? count - 1u : thirdcount)};
 	U cur2{*pdata2}, cur1{*pdata1}, cur0{*pdata0};
-	W const *RSBD8_RESTRICT pdata2stop{!isrevorder? pdata1 : reinterpret_cast<W const *RSBD8_RESTRICT>(input) - 1};
-	W const *RSBD8_RESTRICT pdata1stop{!isrevorder? pdata0 : pdata2};
-	W const *RSBD8_RESTRICT pdata0stop{isrevorder? pdata1 : reinterpret_cast<W const *RSBD8_RESTRICT>(input) - 1};
+	W const *RSBD8_RESTRICT pdata2stop{!isrevorder? pdata1 + 1 : reinterpret_cast<W const *RSBD8_RESTRICT>(input)};
+	W const *RSBD8_RESTRICT pdata1stop{(!isrevorder? pdata0 : pdata2) + 1};
+	W const *RSBD8_RESTRICT pdata0stop{isrevorder? pdata1 + 1 : reinterpret_cast<W const *RSBD8_RESTRICT>(input)};
 	if constexpr(isabsvalue || isfltpmode){// filtered input, convert everything for unsigned comparisons
 		auto[comp2, comp1, comp0]{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2, cur1, cur0)};
 #if defined(_DEBUG) || defined(DEBUG)
@@ -55491,7 +55491,7 @@ handle0filtered:// architecture: jump label reuse (from the else branch, includi
 				prefetchbackward(pdata1 - 1);
 				--pdata1;
 				out = cur1;
-				if(pdata1stop < pdata1){
+				if(pdata1stop <= pdata1){
 					cur1 = *pdata1;
 					comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 				}else{
@@ -55509,7 +55509,7 @@ handle0filtered:// architecture: jump label reuse (from the else branch, includi
 				prefetchbackward(pdata2 - 1);
 				--pdata2;
 				out = cur2;
-				if(pdata2stop < pdata2){
+				if(pdata2stop <= pdata2){
 					cur2 = *pdata2;
 					comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 				}else{
@@ -55532,7 +55532,7 @@ handle0finalfiltered:// architecture: jump label reuse (from the else branch, in
 				prefetchbackward(pdata0 - 1);
 				--pdata0;
 				out = cur0;
-				if(pdata0stop >= pdata0) goto lastloopfiltered;
+				if(pdata0stop > pdata0) goto lastloopfiltered;
 				cur0 = *pdata0;
 				comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 			}
@@ -55550,7 +55550,7 @@ handle0finalfiltered:// architecture: jump label reuse (from the else branch, in
 				previouscomp = comp1;
 #endif
 				--pdata1;
-				if(pdata1stop >= pdata1) pdata1 = pdata2;
+				if(pdata1stop > pdata1) pdata1 = pdata2;
 				out = cur1;
 				cur1 = *pdata1;
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
@@ -55560,7 +55560,7 @@ handle0finalfiltered:// architecture: jump label reuse (from the else branch, in
 				previouscomp = comp2;
 #endif
 				--pdata2;
-				if(pdata2stop >= pdata2) pdata2 = pdata1;
+				if(pdata2stop > pdata2) pdata2 = pdata1;
 				out = cur2;
 				cur2 = *pdata2;
 				comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
@@ -55571,7 +55571,7 @@ handle0oddfiltered:// architecture: jump label reuse (from the else branch, incl
 				previouscomp = comp0;
 #endif
 				--pdata0;
-				if(pdata0stop >= pdata0) pdata0 = pdata1;
+				if(pdata0stop > pdata0) pdata0 = pdata1;
 				out = cur0;
 				cur0 = *pdata0;
 				comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
@@ -55677,7 +55677,7 @@ lastloopfiltered:
 					previouscomp = comp1;
 #endif
 					--pdata1;
-					if(pdata1stop >= pdata1) pdata1 = pdata2;
+					if(pdata1stop > pdata1) pdata1 = pdata2;
 					out = cur1;
 					cur1 = *pdata1;
 					comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
@@ -55687,7 +55687,7 @@ lastloopfiltered:
 					previouscomp = comp2;
 #endif
 					--pdata2;
-					if(pdata2stop >= pdata2) pdata2 = pdata1;
+					if(pdata2stop > pdata2) pdata2 = pdata1;
 					out = cur2;
 					cur2 = *pdata2;
 					comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
@@ -55718,8 +55718,8 @@ lastloopfiltered:
 
 				// the only modification here is this part
 				// never sample beyond the three divisions (the start, one third and two thirds) of the array
-				if(pdata1stop >= pdata1) pdata1 = pdata2;
-				if(pdata2stop >= pdata2) pdata2 = pdata1;
+				if(pdata1stop > pdata1) pdata1 = pdata2;
+				if(pdata2stop > pdata2) pdata2 = pdata1;
 				out1 |= out2;
 				cur1 &= static_cast<M>(notmask);
 
@@ -55816,7 +55816,7 @@ handle0unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				prefetchbackward(pdata1 - 1);
 				--pdata1;
 				out = cur1;
-				if(pdata1stop < pdata1){
+				if(pdata1stop <= pdata1){
 					cur1 = *pdata1;
 				}else{
 					cur1 = cur0;
@@ -55832,7 +55832,7 @@ handle0unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				prefetchbackward(pdata2 - 1);
 				--pdata2;
 				out = cur2;
-				if(pdata2stop < pdata2){
+				if(pdata2stop <= pdata2){
 					cur2 = *pdata2;
 				}else{
 					cur2 = cur1;
@@ -55852,7 +55852,7 @@ handle0finalunfiltered:// architecture: jump label reuse (from the else branch, 
 				prefetchbackward(pdata0 - 1);
 				--pdata0;
 				out = cur0;
-				if(pdata0stop >= pdata0) goto lastloopunfiltered;
+				if(pdata0stop > pdata0) goto lastloopunfiltered;
 				cur0 = *pdata0;
 			}
 			*pout = static_cast<W>(out);
@@ -55869,12 +55869,12 @@ handle0finalunfiltered:// architecture: jump label reuse (from the else branch, 
 				previouscur = cur1;
 #endif
 				--pdata1;
-				if(pdata1stop >= pdata1) pdata1 = pdata2;
+				if(pdata1stop > pdata1) pdata1 = pdata2;
 				out = cur1;
 				cur1 = *pdata1;
 			}else if(!(!isdescsort? cur2 < cur0 : cur0 < cur2)){
 				--pdata2;
-				if(pdata2stop >= pdata2) pdata2 = pdata1;
+				if(pdata2stop > pdata2) pdata2 = pdata1;
 				out = cur2;
 				cur2 = *pdata2;
 			}else{
@@ -55884,7 +55884,7 @@ handle0oddunfiltered:// architecture: jump label reuse (from the else branch, in
 				previouscur = cur0;
 #endif
 				--pdata0;
-				if(pdata0stop >= pdata0) pdata0 = pdata1;
+				if(pdata0stop > pdata0) pdata0 = pdata1;
 				out = cur0;
 				cur0 = *pdata0;
 			}
@@ -55977,7 +55977,7 @@ lastloopunfiltered:
 					previouscur = cur1;
 #endif
 					--pdata1;
-					if(pdata1stop >= pdata1) pdata1 = pdata2;
+					if(pdata1stop > pdata1) pdata1 = pdata2;
 					out = cur1;
 					cur1 = *pdata1;
 				}else{
@@ -55986,7 +55986,7 @@ lastloopunfiltered:
 					previouscur = cur2;
 #endif
 					--pdata2;
-					if(pdata2stop >= pdata2) pdata2 = pdata1;
+					if(pdata2stop > pdata2) pdata2 = pdata1;
 					out = cur2;
 					cur2 = *pdata2;
 				}
@@ -56084,9 +56084,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	U cur0{*pdata0}, cur1{*pdata1}, cur2{*pdata2};
 	std::size_t finalcount{(count >> 1) - thirdcount};// half of count (rounded down) minus thirdcount, used for finalisation
 	--thirdcount;// rounded down and one less, as the final item is handled outside of the loop
-	W const *const pdata0stop{!isrevorder? pdata1 : reinterpret_cast<W const *RSBD8_RESTRICT>(input) + count};
-	W const *const pdata1stop{!isrevorder? pdata2 : pdata0};
-	W const *const pdata2stop{isrevorder? pdata1 : reinterpret_cast<W const *RSBD8_RESTRICT>(input) + count};
+	W const *const pdata0stop{(!isrevorder? pdata1 : reinterpret_cast<W const *RSBD8_RESTRICT>(input) + count) - 1};
+	W const *const pdata1stop{(!isrevorder? pdata2 : pdata0) - 1};
+	W const *const pdata2stop{(isrevorder? pdata1 : reinterpret_cast<W const *RSBD8_RESTRICT>(input) + count) - 1};
 	if constexpr(isabsvalue || isfltpmode){// filtered input, convert everything for unsigned comparisons
 		auto[comp0, comp1, comp2]{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0, cur1, cur2)};
 #if defined(_DEBUG) || defined(DEBUG)
@@ -56145,7 +56145,7 @@ handle2filtered:// architecture: jump label reuse (from the else branch, includi
 				prefetchforward(pdata1 + 1);
 				++pdata1;
 				out = cur1;
-				if(pdata1stop > pdata1){
+				if(pdata1stop >= pdata1){
 					cur1 = *pdata1;
 					comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 				}else{
@@ -56162,7 +56162,7 @@ handle2filtered:// architecture: jump label reuse (from the else branch, includi
 				prefetchforward(pdata0 + 1);
 				++pdata0;
 				out = cur0;
-				if(pdata0stop > pdata0){
+				if(pdata0stop >= pdata0){
 					cur0 = *pdata0;
 					comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 				}else{
@@ -56183,7 +56183,7 @@ handle2finalfiltered:// architecture: jump label reuse (from the else branch, in
 				prefetchforward(pdata2 + 1);
 				++pdata2;
 				out = cur2;
-				if(pdata2stop <= pdata2) goto lastloopfiltered;
+				if(pdata2stop < pdata2) goto lastloopfiltered;
 				cur2 = *pdata2;
 				comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 			}
@@ -56346,7 +56346,7 @@ handle2unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				prefetchforward(pdata1 + 1);
 				++pdata1;
 				out = cur1;
-				if(pdata1stop > pdata1){
+				if(pdata1stop >= pdata1){
 					cur1 = *pdata1;
 				}else{
 					cur1 = cur2;
@@ -56361,7 +56361,7 @@ handle2unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				prefetchforward(pdata0 + 1);
 				++pdata0;
 				out = cur0;
-				if(pdata0stop > pdata0){
+				if(pdata0stop >= pdata0){
 					cur0 = *pdata0;
 				}else{
 					cur0 = cur1;
@@ -56379,7 +56379,7 @@ handle2finalunfiltered:// architecture: jump label reuse (from the else branch, 
 				prefetchforward(pdata2 + 1);
 				++pdata2;
 				out = cur2;
-				if(pdata2stop <= pdata2) goto lastloopunfiltered;
+				if(pdata2stop < pdata2) goto lastloopunfiltered;
 				cur2 = *pdata2;
 			}
 			*pout = static_cast<W>(out);
@@ -56603,7 +56603,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 						// given the absolute rarity of this case, simply process this part in the current thread
-						pcall(thirdcounttop, allowedthreads, pfuturesplaceholder, pzeroedindices, input + twothirdscount, output + twothirdscount, buffer + twothirdscount);
+						pcall(thirdcounttop, allowedthreads, pfuturesiter, pindicesiter, input + twothirdscount, output + twothirdscount, buffer + twothirdscount);
 					}
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
@@ -56777,7 +56777,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 						// given the absolute rarity of this case, simply process this part in the current thread
-						pcall(thirdcounttop, allowedthreads, pfuturesplaceholder, pzeroedindices, input + twothirdscount, buffer + twothirdscount, movetobuffer);
+						pcall(thirdcounttop, allowedthreads, pfuturesiter, pindicesiter, input + twothirdscount, buffer + twothirdscount, movetobuffer);
 					}
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
@@ -56968,7 +56968,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}catch(...){// std::async may fail gracefully here
 								assert(false);
 								// given the absolute rarity of this case, simply process this part in the current thread
-								pcall(thirdcounttop, allowedthreads, pfuturesplaceholder, pzeroedindices, input + twothirdscount, output + twothirdscount, buffer + twothirdscount);
+								pcall(thirdcounttop, allowedthreads, pfuturesiter, pindicesiter, input + twothirdscount, output + twothirdscount, buffer + twothirdscount);
 							}
 						}catch(...){// std::async may fail gracefully here
 							assert(false);
@@ -57239,7 +57239,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}catch(...){// std::async may fail gracefully here
 								assert(false);
 								// given the absolute rarity of this case, simply process this part in the current thread
-								pcall(thirdcounttop, allowedthreads, pfuturesplaceholder, pzeroedindices, input + twothirdscount, buffer + twothirdscount, movetobuffer);
+								pcall(thirdcounttop, allowedthreads, pfuturesiter, pindicesiter, input + twothirdscount, buffer + twothirdscount, movetobuffer);
 							}
 						}catch(...){// std::async may fail gracefully here
 							assert(false);
@@ -57415,6 +57415,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::intptr_t *RSBD8_RESTRICT pout{reinterpret_cast<std::intptr_t *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(output)) + (count - 1u)};
 	std::intptr_t const *RSBD8_RESTRICT pdatahi{reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(input)) + (!isrevorder? count - 1u : halfcount)};
 	std::intptr_t const *RSBD8_RESTRICT pdatalo{reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(input)) + (isrevorder? count - 1u : halfcount)};
+	// the companion variant of this function must not dip below the very bottom of the input array for prefetching
+	std::intptr_t const *RSBD8_RESTRICT pdatastop{reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(input))};
 	std::intptr_t phi{*pdatahi}, plo{*pdatalo};
 	auto imhiinit{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(phi), std::forward<vararguments>(varparameters)...)};
 	auto imloinit{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(plo), std::forward<vararguments>(varparameters)...)};
@@ -57441,7 +57443,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalo)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					std::intptr_t const *RSBD8_RESTRICT pdatalimited{pdatalo - prefetchmaxstride / (2u * sizeof(V *))};
+					if constexpr(!isrevorder) pdatalimited = (pdatalimited > pdatastop)? pdatalimited : pdatastop;
+					pn = *reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalimited);
 				}
 				auto imlo{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(plo), std::forward<vararguments>(varparameters)...)};
 				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imlo, std::forward<vararguments>(varparameters)...)};
@@ -57461,7 +57465,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatahi)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					std::intptr_t const *RSBD8_RESTRICT pdatalimited{pdatahi - prefetchmaxstride / (2u * sizeof(V *))};
+					if constexpr(isrevorder) pdatalimited = (pdatalimited > pdatastop)? pdatalimited : pdatastop;
+					pn = *reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalimited);
 				}
 				auto imhi{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(phi), std::forward<vararguments>(varparameters)...)};
 				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imhi, std::forward<vararguments>(varparameters)...)};
@@ -57506,8 +57512,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
+				std::intptr_t const *RSBD8_RESTRICT platestlimited{platestlo - prefetchmaxstride / (2u * sizeof(V *))};
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(platestlo)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				platestlimited = (platestlimited > pdatastop)? platestlimited : pdatastop;
+				pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(platestlimited);
 			}
 			prefetchbackward(reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(platestlo) - 1);
 			std::intptr_t latestlo{*reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(platestlo)};
@@ -57665,6 +57673,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::intptr_t *RSBD8_RESTRICT pout{reinterpret_cast<std::intptr_t *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(output))};
 	std::intptr_t const *RSBD8_RESTRICT pdatalo{reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(input)) + isrevorder * halfcount};
 	std::intptr_t const *RSBD8_RESTRICT pdatahi{reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(input)) + !isrevorder * halfcount};
+	// the main variant of this function must not peak above the very top of the input array for prefetching
+	std::intptr_t const *RSBD8_RESTRICT pdatastop{reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(input)) + (count - 1u)};
 	std::intptr_t plo{*pdatalo}, phi{*pdatahi};
 	--halfcount;// rounded down and one less, as the final item is handled outside of the loop
 	auto imloinit{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(plo), std::forward<vararguments>(varparameters)...)};
@@ -57692,7 +57702,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatahi)[prefetchmaxstride / (2u * sizeof(V *))];
+					std::intptr_t const *RSBD8_RESTRICT pdatalimited{pdatahi + prefetchmaxstride / (2u * sizeof(V *))};
+					if constexpr(!isrevorder) pdatalimited = (pdatalimited < pdatastop)? pdatalimited : pdatastop;
+					pn = *reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalimited);
 				}
 				auto imhi{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(phi), std::forward<vararguments>(varparameters)...)};
 				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imhi, std::forward<vararguments>(varparameters)...)};
@@ -57712,7 +57724,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalo)[prefetchmaxstride / (2u * sizeof(V *))];
+					std::intptr_t const *RSBD8_RESTRICT pdatalimited{pdatalo + prefetchmaxstride / (2u * sizeof(V *))};
+					if constexpr(isrevorder) pdatalimited = (pdatalimited < pdatastop)? pdatalimited : pdatastop;
+					pn = *reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalimited);
 				}
 				auto imlo{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(plo), std::forward<vararguments>(varparameters)...)};
 				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imlo, std::forward<vararguments>(varparameters)...)};
@@ -57757,8 +57771,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
+				std::intptr_t const *RSBD8_RESTRICT platestlimited{platesthi + prefetchmaxstride / (2u * sizeof(V *))};
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(platesthi)[prefetchmaxstride / (2u * sizeof(V *))];
+				platestlimited = (platestlimited < pdatastop)? platestlimited : pdatastop;
+				pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(platestlimited);
 			}
 			prefetchforward(reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(platesthi) + 1);
 			std::intptr_t latesthi{*reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(platesthi)};
@@ -58170,9 +58186,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	auto cur2init{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2init, std::forward<vararguments>(varparameters)...)};
 	auto cur1init{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1init, std::forward<vararguments>(varparameters)...)};
 	auto cur0init{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0init, std::forward<vararguments>(varparameters)...)};
-	std::intptr_t const *RSBD8_RESTRICT pdata2stop{!isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(input)) - 1};
-	std::intptr_t const *RSBD8_RESTRICT pdata1stop{!isrevorder? pdata0 : pdata2};
-	std::intptr_t const *RSBD8_RESTRICT pdata0stop{isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(input)) - 1};
+	// the companion variant of this function must not dip below the very bottom of the input array for prefetching
+	std::intptr_t const *RSBD8_RESTRICT pdata2stop{!isrevorder? pdata1 + 1 : reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(input))};
+	std::intptr_t const *RSBD8_RESTRICT pdata1stop{(!isrevorder? pdata0 : pdata2) + 1};
+	std::intptr_t const *RSBD8_RESTRICT pdata0stop{isrevorder? pdata1 + 1 : reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(input))};
 	auto[comp2, comp1, comp0]{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2init, cur1init, cur0init)};
 #if defined(_DEBUG) || defined(DEBUG)
 	decltype(comp2) previouscomp;// used for debug assertion of the sorted order
@@ -58214,7 +58231,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(pdata2))[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				std::intptr_t const *RSBD8_RESTRICT pdatalimited{pdata2 - prefetchmaxstride / (2u * sizeof(V *))};
+				if constexpr(isrevorder) pdatalimited = (pdatalimited > pdata2stop)? pdatalimited : pdata2stop;
+				pn = *reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalimited);
 			}
 			auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p2), std::forward<vararguments>(varparameters)...)};
 			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, std::forward<vararguments>(varparameters)...)};
@@ -58235,7 +58254,9 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(pdata0))[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				std::intptr_t const *RSBD8_RESTRICT pdatalimited{pdata0 - prefetchmaxstride / (2u * sizeof(V *))};
+				if constexpr(!isrevorder) pdatalimited = (pdatalimited > pdata0stop)? pdatalimited : pdata0stop;
+				pn = *reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalimited);
 			}
 			auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p0), std::forward<vararguments>(varparameters)...)};
 			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, std::forward<vararguments>(varparameters)...)};
@@ -58260,7 +58281,7 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 			prefetchbackward(pdata1 - 1);
 			--pdata1;
 			out = p1;
-			if(pdata1stop < pdata1){
+			if(pdata1stop <= pdata1){
 				p1 = *pdata1;
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
@@ -58287,12 +58308,14 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 			prefetchbackward(pdata2 - 1);
 			--pdata2;
 			out = p2;
-			if(pdata2stop < pdata2){
+			if(pdata2stop <= pdata2){
 				p2 = *pdata2;
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(pdata2))[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					std::intptr_t const *RSBD8_RESTRICT pdatalimited{pdata2 - prefetchmaxstride / (2u * sizeof(V *))};
+					if constexpr(isrevorder) pdatalimited = (pdatalimited > pdata2stop)? pdatalimited : pdata2stop;
+					pn = *reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalimited);
 				}
 				auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p2), std::forward<vararguments>(varparameters)...)};
 				auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, std::forward<vararguments>(varparameters)...)};
@@ -58318,12 +58341,14 @@ handle0final:// architecture: jump label reuse (from the else branch, including 
 			prefetchbackward(pdata0 - 1);
 			--pdata0;
 			out = p0;
-			if(pdata0stop >= pdata0) goto lastloop;
+			if(pdata0stop > pdata0) goto lastloop;
 			p0 = *pdata0;
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(pdata0))[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				std::intptr_t const *RSBD8_RESTRICT pdatalimited{pdata0 - prefetchmaxstride / (2u * sizeof(V *))};
+				if constexpr(!isrevorder) pdatalimited = (pdatalimited > pdata0stop)? pdatalimited : pdata0stop;
+				pn = *reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalimited);
 			}
 			auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p0), std::forward<vararguments>(varparameters)...)};
 			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, std::forward<vararguments>(varparameters)...)};
@@ -58346,7 +58371,7 @@ handle0final:// architecture: jump label reuse (from the else branch, including 
 			previouscomp = comp1;
 #endif
 			--pdata1;
-			if(pdata1stop >= pdata1) pdata1 = pdata2;
+			if(pdata1stop > pdata1) pdata1 = pdata2;
 			out = p1;
 			p1 = *pdata1;
 			auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p1), std::forward<vararguments>(varparameters)...)};
@@ -58358,7 +58383,7 @@ handle0final:// architecture: jump label reuse (from the else branch, including 
 			previouscomp = comp2;
 #endif
 			--pdata2;
-			if(pdata2stop >= pdata2) pdata2 = pdata1;
+			if(pdata2stop > pdata2) pdata2 = pdata1;
 			out = p2;
 			p2 = *pdata2;
 			auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p2), std::forward<vararguments>(varparameters)...)};
@@ -58371,7 +58396,7 @@ handle0odd:// architecture: jump label reuse (from the else branch, including po
 			previouscomp = comp0;
 #endif
 			--pdata0;
-			if(pdata0stop >= pdata0) pdata0 = pdata1;
+			if(pdata0stop > pdata0) pdata0 = pdata1;
 			out = p0;
 			p0 = *pdata0;
 			auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p0), std::forward<vararguments>(varparameters)...)};
@@ -58402,7 +58427,9 @@ lastloop:
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(pdata1))[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					std::intptr_t const *RSBD8_RESTRICT pdatalimited{pdata1 - prefetchmaxstride / (2u * sizeof(V *))};
+					if constexpr(!isrevorder) pdatalimited = (pdatalimited > pdata1stop)? pdatalimited : pdata1stop;
+					pn = *reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalimited);
 				}
 				auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p1), std::forward<vararguments>(varparameters)...)};
 				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, std::forward<vararguments>(varparameters)...)};
@@ -58422,7 +58449,9 @@ lastloop:
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(pdata2))[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					std::intptr_t const *RSBD8_RESTRICT pdatalimited{pdata2 - prefetchmaxstride / (2u * sizeof(V *))};
+					if constexpr(isrevorder) pdatalimited = (pdatalimited > pdata2stop)? pdatalimited : pdata2stop;
+					pn = *reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalimited);
 				}
 				auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p2), std::forward<vararguments>(varparameters)...)};
 				auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, std::forward<vararguments>(varparameters)...)};
@@ -58467,8 +58496,11 @@ lastloop:
 
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
+				std::intptr_t const *RSBD8_RESTRICT platestlimited{platest1 - prefetchmaxstride / (2u * sizeof(V *))};
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(platest1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				std::intptr_t const *RSBD8_RESTRICT pdatastop{isrevorder? pdata2stop : pdata1stop};
+				platestlimited = (platestlimited > pdatastop)? platestlimited : pdatastop;
+				pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(platestlimited);
 			}
 			prefetchbackward(reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(platest1) - 1);
 			std::intptr_t latest1{*reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(platest1)};
@@ -58509,7 +58541,7 @@ lastloop:
 				previouscomp = comp1;
 #endif
 				--pdata1;
-				if(pdata1stop >= pdata1) pdata1 = pdata2;
+				if(pdata1stop > pdata1) pdata1 = pdata2;
 				out = p1;
 				p1 = *pdata1;
 				auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p1), std::forward<vararguments>(varparameters)...)};
@@ -58521,7 +58553,7 @@ lastloop:
 				previouscomp = comp2;
 #endif
 				--pdata2;
-				if(pdata2stop >= pdata2) pdata2 = pdata1;
+				if(pdata2stop > pdata2) pdata2 = pdata1;
 				out = p2;
 				p2 = *pdata2;
 				auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p2), std::forward<vararguments>(varparameters)...)};
@@ -58554,8 +58586,8 @@ lastloop:
 
 			// the only modification here is this part
 			// never sample beyond the three divisions (the start, one third and two thirds) of the array
-			if(pdata1stop >= pdata1) pdata1 = pdata2;
-			if(pdata2stop >= pdata2) pdata2 = pdata1;
+			if(pdata1stop > pdata1) pdata1 = pdata2;
+			if(pdata2stop > pdata2) pdata2 = pdata1;
 			out1 |= out2;
 			p1 &= notmask;
 
@@ -58634,9 +58666,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	auto cur0init{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0init, std::forward<vararguments>(varparameters)...)};
 	auto cur1init{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1init, std::forward<vararguments>(varparameters)...)};
 	auto cur2init{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2init, std::forward<vararguments>(varparameters)...)};
-	std::intptr_t const *const pdata0stop{!isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(input)) + count};
-	std::intptr_t const *const pdata1stop{!isrevorder? pdata2 : pdata0};
-	std::intptr_t const *const pdata2stop{isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(input)) + count};
+	// the main variant of this function must not peak above the very top of the input array for prefetching
+	std::intptr_t const *const pdata0stop{(!isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(input)) + count) - 1};
+	std::intptr_t const *const pdata1stop{(!isrevorder? pdata2 : pdata0) - 1};
+	std::intptr_t const *const pdata2stop{(isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(input)) + count) - 1};
 	auto[comp0, comp1, comp2]{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0init, cur1init, cur2init)};
 #if defined(_DEBUG) || defined(DEBUG)
 	decltype(comp0) previouscomp;// used for debug assertion of the sorted order
@@ -58678,7 +58711,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(pdata0))[prefetchmaxstride / (2u * sizeof(V *))];
+				std::intptr_t const *RSBD8_RESTRICT pdatalimited{pdata0 + prefetchmaxstride / (2u * sizeof(V *))};
+				if constexpr(isrevorder) pdatalimited = (pdatalimited < pdata0stop)? pdatalimited : pdata0stop;
+				pn = *reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalimited);
 			}
 			auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p0), std::forward<vararguments>(varparameters)...)};
 			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, std::forward<vararguments>(varparameters)...)};
@@ -58699,7 +58734,9 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(pdata2))[prefetchmaxstride / (2u * sizeof(V *))];
+				std::intptr_t const *RSBD8_RESTRICT pdatalimited{pdata2 + prefetchmaxstride / (2u * sizeof(V *))};
+				if constexpr(!isrevorder) pdatalimited = (pdatalimited < pdata2stop)? pdatalimited : pdata2stop;
+				pn = *reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalimited);
 			}
 			auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p2), std::forward<vararguments>(varparameters)...)};
 			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, std::forward<vararguments>(varparameters)...)};
@@ -58724,7 +58761,7 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 			prefetchforward(pdata1 + 1);
 			++pdata1;
 			out = p1;
-			if(pdata1stop > pdata1){
+			if(pdata1stop >= pdata1){
 				p1 = *pdata1;
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
@@ -58750,12 +58787,14 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 			prefetchforward(pdata0 + 1);
 			++pdata0;
 			out = p0;
-			if(pdata0stop > pdata0){
+			if(pdata0stop >= pdata0){
 				p0 = *pdata0;
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(pdata0))[prefetchmaxstride / (2u * sizeof(V *))];
+					std::intptr_t const *RSBD8_RESTRICT pdatalimited{pdata0 + prefetchmaxstride / (2u * sizeof(V *))};
+					if constexpr(isrevorder) pdatalimited = (pdatalimited < pdata0stop)? pdatalimited : pdata0stop;
+					pn = *reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalimited);
 				}
 				auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p0), std::forward<vararguments>(varparameters)...)};
 				auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, std::forward<vararguments>(varparameters)...)};
@@ -58779,12 +58818,14 @@ handle2final:// architecture: jump label reuse (from the else branch, including 
 			prefetchforward(pdata2 + 1);
 			++pdata2;
 			out = p2;
-			if(pdata2stop <= pdata2) goto lastloop;
+			if(pdata2stop < pdata2) goto lastloop;
 			p2 = *pdata2;
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(pdata2))[prefetchmaxstride / (2u * sizeof(V *))];
+				std::intptr_t const *RSBD8_RESTRICT pdatalimited{pdata2 + prefetchmaxstride / (2u * sizeof(V *))};
+				if constexpr(!isrevorder) pdatalimited = (pdatalimited < pdata2stop)? pdatalimited : pdata2stop;
+				pn = *reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalimited);
 			}
 			auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p2), std::forward<vararguments>(varparameters)...)};
 			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, std::forward<vararguments>(varparameters)...)};
@@ -58819,7 +58860,9 @@ lastloop:
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(pdata1))[prefetchmaxstride / (2u * sizeof(V *))];
+					std::intptr_t const *RSBD8_RESTRICT pdatalimited{pdata1 + prefetchmaxstride / (2u * sizeof(V *))};
+					if constexpr(!isrevorder) pdatalimited = (pdatalimited < pdata1stop)? pdatalimited : pdata1stop;
+					pn = *reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalimited);
 				}
 				auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p1), std::forward<vararguments>(varparameters)...)};
 				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, std::forward<vararguments>(varparameters)...)};
@@ -58839,7 +58882,9 @@ lastloop:
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(reinterpret_cast<std::intptr_t>(pdata0))[prefetchmaxstride / (2u * sizeof(V *))];
+					std::intptr_t const *RSBD8_RESTRICT pdatalimited{pdata0 + prefetchmaxstride / (2u * sizeof(V *))};
+					if constexpr(isrevorder) pdatalimited = (pdatalimited < pdata0stop)? pdatalimited : pdata0stop;
+					pn = *reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(pdatalimited);
 				}
 				auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *RSBD8_RESTRICT>(p0), std::forward<vararguments>(varparameters)...)};
 				auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, std::forward<vararguments>(varparameters)...)};
@@ -58884,8 +58929,11 @@ lastloop:
 
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
+				std::intptr_t const *RSBD8_RESTRICT platestlimited{platest1 + prefetchmaxstride / (2u * sizeof(V *))};
+				std::intptr_t const *RSBD8_RESTRICT pdatastop{isrevorder? pdata0stop : pdata1stop};
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(platest1)[prefetchmaxstride / (2u * sizeof(V *))];
+				platestlimited = (platestlimited < pdatastop)? platestlimited : pdatastop;
+				pn = reinterpret_cast<V *const RSBD8_RESTRICT *RSBD8_RESTRICT>(platestlimited);
 			}
 			prefetchforward(reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(platest1) + 1);
 			std::intptr_t latest1{*reinterpret_cast<std::intptr_t const *RSBD8_RESTRICT>(platest1)};
@@ -59054,7 +59102,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 						// given the absolute rarity of this case, simply process this part in the current thread
-						pcall(thirdcounttop, allowedthreads, pfuturesplaceholder, pzeroedindices, input + twothirdscount, output + twothirdscount, buffer + twothirdscount, std::forward<vararguments>(varparameters)...);
+						pcall(thirdcounttop, allowedthreads, pfuturesiter, pindicesiter, input + twothirdscount, output + twothirdscount, buffer + twothirdscount, std::forward<vararguments>(varparameters)...);
 					}
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
@@ -59227,7 +59275,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 						// given the absolute rarity of this case, simply process this part in the current thread
-						pcall(thirdcounttop, allowedthreads, pfuturesplaceholder, pzeroedindices, input + twothirdscount, buffer + twothirdscount, movetobuffer, std::forward<vararguments>(varparameters)...);
+						pcall(thirdcounttop, allowedthreads, pfuturesiter, pindicesiter, input + twothirdscount, buffer + twothirdscount, movetobuffer, std::forward<vararguments>(varparameters)...);
 					}
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
@@ -59417,7 +59465,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}catch(...){// std::async may fail gracefully here
 								assert(false);
 								// given the absolute rarity of this case, simply process this part in the current thread
-								pcall(thirdcounttop, allowedthreads, pfuturesplaceholder, pzeroedindices, input + twothirdscount, output + twothirdscount, buffer + twothirdscount, std::forward<vararguments>(varparameters)...);
+								pcall(thirdcounttop, allowedthreads, pfuturesiter, pindicesiter, input + twothirdscount, output + twothirdscount, buffer + twothirdscount, std::forward<vararguments>(varparameters)...);
 							}
 						}catch(...){// std::async may fail gracefully here
 							assert(false);
@@ -59687,7 +59735,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}catch(...){// std::async may fail gracefully here
 								assert(false);
 								// given the absolute rarity of this case, simply process this part in the current thread
-								pcall(thirdcounttop, allowedthreads, pfuturesplaceholder, pzeroedindices, input + twothirdscount, buffer + twothirdscount, movetobuffer, std::forward<vararguments>(varparameters)...);
+								pcall(thirdcounttop, allowedthreads, pfuturesiter, pindicesiter, input + twothirdscount, buffer + twothirdscount, movetobuffer, std::forward<vararguments>(varparameters)...);
 							}
 						}catch(...){// std::async may fail gracefully here
 							assert(false);
